@@ -1,8 +1,6 @@
 import speech_recognition as sr
 import time
 
-from test_voice_recognition import VoiceRecognition
-
 class VoiceRecording:
     """Class for handling voice recording."""
 
