@@ -83,7 +83,6 @@ class Voice2text:
 if __name__ == "__main__":
     # Example usage
     voice_recording = Voice2text()
-    audio = voice_recording.record_voice()
-    text = voice_recording.recognize_recorded_voice(audio)
+    text = voice_recording.voice_to_text(api="all")
     print(f"Recognized text: {text}")
 
