@@ -11,12 +11,12 @@ services:
   # Script 1 : Test de connexion (Popup)
   test-connexion:
     <<: *base-robot
-    command: python Connection_Test.py
+    command: python Robot_control/Connection_Test.py
 
   # Script 2 : Contrôle clavier (Le plus complexe)
   keyboard:
     <<: *base-robot
-    command: python keyboard_control.py
+    command: python Robot_control/keyboard_control.py
     privileged: true
     stdin_open: true
     tty: true
@@ -26,4 +26,4 @@ services:
   # Script 3 : Lecture des joints
   reading:
     <<: *base-robot
-    command: python Test_rtde_read.py
+    command: python Robot_control/Test_rtde_read.py

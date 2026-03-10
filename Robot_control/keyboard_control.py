@@ -2,7 +2,7 @@ import time
 import keyboard
 from rtde_control import RTDEControlInterface
 
-ROBOT_IP = "192.168.1.102"
+ROBOT_IP = "10.159.202.217"
 
 rtde_c = RTDEControlInterface(ROBOT_IP)
 

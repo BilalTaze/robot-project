@@ -1,6 +1,6 @@
 import socket
 
-HOST = "192.168.1.102"   # URSim IP
+HOST = "10.159.202.217"  # URSim IP
 PORT = 30001             # Interface port
 
 # Socket creation
