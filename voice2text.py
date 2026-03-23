@@ -30,17 +30,21 @@ class Voice2text:
         audio = self.record_voice(mic_index)
         return self.recognize_recorded_voice(audio, api)
 
-    def record_voice(self, mic_index: int=0) -> sr.AudioData:
+    def record_voice(self, mic_index: int=0, timeout: int=2, phrase_time_limit: int=20) -> sr.AudioData:
         """
         Record voice from the microphone.
         
         ### Parameters:
             mic_index: The index of the microphone to use. Default is 0.
+            timeout: Seconds to wait for speech to start before giving up. Default is 20.
+            phrase_time_limit: Max seconds of recording once speech starts. Default is 20.
 
         ### Returns:
             audio: The recorded audio.
+
+        ### Raises:
+            sr.WaitTimeoutError: If no speech is detected within `timeout` seconds.
         """
-        # choose one from the list as 
         self.mic = sr.Microphone(device_index=mic_index)
 
         time.sleep(1)  # wait 1 second for the microphone to initialize
@@ -48,7 +52,7 @@ class Voice2text:
         print("Recording... Please speak into the microphone.")
         with self.mic as source:
             self.recognizer.adjust_for_ambient_noise(source)
-            audio = self.recognizer.listen(source)
+            audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
             print("Recording complete.")
         
         return audio
@@ -81,8 +85,7 @@ class Voice2text:
 
 
 if __name__ == "__main__":
-    # Example usage
+    # Utilisation simple : uniquement l'API Google (pas besoin de clé API)
     voice_recording = Voice2text()
-    text = voice_recording.voice_to_text(api="all")
+    text = voice_recording.voice_to_text(api="google")
     print(f"Recognized text: {text}")
-
