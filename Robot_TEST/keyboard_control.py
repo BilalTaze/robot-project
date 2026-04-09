@@ -5,7 +5,7 @@ from rtde_control import RTDEControlInterface
 from rtde_receive import RTDEReceiveInterface
 
 
-ROBOT_IP = "10.220.8.217"
+ROBOT_IP = "172.20.10.2"
 
 rtde_c = RTDEControlInterface(ROBOT_IP)
 rtde_r = RTDEReceiveInterface(ROBOT_IP)
