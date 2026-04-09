@@ -1,5 +1,4 @@
 import speech_recognition as sr
-import time
 import whisper
 import numpy as np
 import torch
