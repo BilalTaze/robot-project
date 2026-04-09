@@ -10,7 +10,7 @@ class Voice2text:
         """
         Initialize the recognizer and Whisper model.
         Model options: "tiny", "base", "small", "medium", "large"
-        "base" est un bon compromis vitesse/précision pour un UR3.
+        "base" is a good option speed/precision for an UR3.
         """
         self.recognizer = sr.Recognizer()
         print(f"Loading Whisper model '{model_name}'...")

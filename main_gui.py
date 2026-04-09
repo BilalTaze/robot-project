@@ -1,5 +1,6 @@
 import tkinter as tk
 import threading
+import time
 from voice_processing import Voice2text  # Import de votre classe modifiée
 
 class RobotVoiceApp:
@@ -26,13 +27,19 @@ class RobotVoiceApp:
         thread = threading.Thread(target=self.process_voice)
         thread.start()
 
-        self.btn_listen.config(state="disabled", text="Listenning...")
+        time.sleep(1.8)  # wait a bit to ensure the thread has started before updating the UI
+        self.btn_listen.config(state="disabled", text="Recording...")
         self.text_output.delete("1.0", tk.END)
         
     def process_voice(self):
         # Appel de votre méthode Whisper
-        result = self.voice_engine.voice_to_text(mic_index=0, api="whisper")
-        
+        audio = self.voice_engine.record_voice(mic_index=0)
+
+        self.btn_listen.config(state="disabled", text="Listenning...")
+        self.text_output.delete("1.0", tk.END)
+
+        result = self.voice_engine.recognize_recorded_voice(audio, api="whisper")
+
         # Mise à jour de l'interface (doit être fait via la file principale)
         self.root.after(0, self.update_ui, result)
 
