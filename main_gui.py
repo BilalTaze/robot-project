@@ -1,5 +1,4 @@
 import tkinter as tk
-from tkinter import messagebox
 import threading
 from voice_processing import Voice2text  # Import de votre classe modifiée
 
@@ -16,9 +15,7 @@ class RobotVoiceApp:
         self.label_status = tk.Label(root, text="Ready for UR3", font=("Arial", 12))
         self.label_status.pack(pady=20)
 
-        self.btn_listen = tk.Button(root, text="🎙 SPEAK", command=self.start_listening_thread, 
-                                   bg="red", fg="white", font=("Arial", 14, "bold"),
-                                   width=15, height=2)
+        self.btn_listen = tk.Button(root, text="🎙 SPEAK", command=self.start_listening_thread, bg="red", fg="white", font=("Arial", 14, "bold"), width=15, height=2)
         self.btn_listen.pack(pady=10)
 
         self.text_output = tk.Text(root, height=5, width=40, font=("Arial", 10))
@@ -26,12 +23,12 @@ class RobotVoiceApp:
         
     def start_listening_thread(self):
         """Lance la reconnaissance dans un thread séparé pour ne pas figer l'interface."""
-        self.btn_listen.config(state="disabled", text="Écoute en cours...")
-        self.text_output.delete("1.0", tk.END)
-        
         thread = threading.Thread(target=self.process_voice)
         thread.start()
 
+        self.btn_listen.config(state="disabled", text="Listenning...")
+        self.text_output.delete("1.0", tk.END)
+        
     def process_voice(self):
         # Appel de votre méthode Whisper
         result = self.voice_engine.voice_to_text(mic_index=0, api="whisper")
@@ -49,7 +46,7 @@ class RobotVoiceApp:
             self.text_output.insert(tk.END, "Sorry, I didn't understand or hear anything.")
             self.label_status.config(text="Reception failed", fg="orange")
         else:
-            self.text_output.insert(tk.END, f"Understood: : {result}")
+            self.text_output.insert(tk.END, f"Understood : {result}")
             self.label_status.config(text="Command received!", fg="green")
             
             # C'est ici que vous pourriez ajouter :
