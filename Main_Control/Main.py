@@ -1,7 +1,6 @@
 from Parser import parse_command
 from Robot_control import RobotController
 
-
 ROBOT_IP = "10.220.8.217"
 
 
@@ -17,6 +16,9 @@ def main():
 
             cmd = parse_command(sentence)
             print("Parsed command:", cmd)
+
+            if cmd is None:
+                continue
 
             robot.execute_command(cmd)
 
