@@ -2,6 +2,8 @@ COMMANDS = {
     "action": {
         "move": "move",
         "go": "move",
+        "rotate": "rotate",
+        "turn": "rotate",
         "stop": "stop"
     },
 
@@ -20,18 +22,22 @@ COMMANDS = {
         "-": -1
     },
 
+    # translation
     "distance": {
-        "little": 0.02,
         "small": 0.02,
         "medium": 0.05,
-        "more": 0.05,
-        "far": 0.10,
-        "big": 0.10
+        "far": 0.10
+    },
+
+    # rotation (en radians approx)
+    "angle": {
+        "small": 0.1,
+        "medium": 0.3,
+        "far": 0.6
     },
 
     "frame": {
         "base": "base",
-        "robot": "base",
         "tool": "tool",
         "tcp": "tool"
     }
