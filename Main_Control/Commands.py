@@ -4,7 +4,10 @@ COMMANDS = {
         "go": "move",
         "rotate": "rotate",
         "turn": "rotate",
-        "stop": "stop"
+        "stop": "stop",
+        "sequence": "sequence",
+        "run": "run",
+        "clear": "clear"
     },
 
     "axis": {

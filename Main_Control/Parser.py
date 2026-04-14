@@ -1,87 +1,91 @@
+import re
 from Commands import COMMANDS
 from Distance_parser import extract_distance, extract_angle
-import re
 
 
 def parse_command(sentence):
+    s = sentence.lower().replace("-", " ").strip()
+    words = s.split()
 
-    words = sentence.lower().replace("-", " ").split()
+    # commandes spéciales séquence
+    if s == "sequence mode":
+        return {"action": "sequence_mode"}
+
+    if s == "run sequence":
+        return {"action": "run_sequence"}
+
+    if s == "clear sequence":
+        return {"action": "clear_sequence"}
 
     action = None
     axis = None
     sign = None
     frame = "tool"
 
-    dist = extract_distance(sentence)
-    angle = extract_angle(sentence)
+    qualitative_distance = None
+    qualitative_angle = None
 
-    q_dist = None
-    q_angle = None
+    numeric_distance = extract_distance(sentence)
+    numeric_angle = extract_angle(sentence)
 
-    for w in words:
-        if w in COMMANDS["action"]:
-            action = COMMANDS["action"][w]
+    has_digit = bool(re.search(r"\d+", sentence))
 
-        if w in COMMANDS["axis"]:
-            axis = w
+    for word in words:
+        if word in COMMANDS["action"]:
+            action = COMMANDS["action"][word]
 
-        if w in COMMANDS["sign"]:
-            sign = COMMANDS["sign"][w]
+        if word in COMMANDS["axis"]:
+            axis = word
 
-        if w in COMMANDS["frame"]:
-            frame = COMMANDS["frame"][w]
+        if word in COMMANDS["sign"]:
+            sign = COMMANDS["sign"][word]
 
-        if w in COMMANDS["distance"]:
-            q_dist = COMMANDS["distance"][w]
+        if word in COMMANDS["frame"]:
+            frame = COMMANDS["frame"][word]
 
-        if w in COMMANDS["angle"]:
-            q_angle = COMMANDS["angle"][w]
+        if word in COMMANDS["distance"]:
+            qualitative_distance = COMMANDS["distance"][word]
 
-    if re.search(r"\d+", sentence):
+        if word in COMMANDS["angle"]:
+            qualitative_angle = COMMANDS["angle"][word]
+
+    if has_digit:
         return None
 
     if axis is None or sign is None or action is None:
         return None
 
-    # -------- ROTATION --------
     if action == "rotate":
-
-        if angle is not None and q_angle is not None:
+        if numeric_angle is not None and qualitative_angle is not None:
             return None
 
-        value = angle if angle is not None else q_angle
-
+        value = numeric_angle if numeric_angle is not None else qualitative_angle
         if value is None:
             return None
 
-        rot = [0, 0, 0]
-
+        rotation = [0, 0, 0]
         if axis == "x":
-            rot = [sign * value, 0, 0]
+            rotation = [sign * value, 0, 0]
         elif axis == "y":
-            rot = [0, sign * value, 0]
+            rotation = [0, sign * value, 0]
         elif axis == "z":
-            rot = [0, 0, sign * value]
+            rotation = [0, 0, sign * value]
 
         return {
             "action": "rotate",
-            "rotation": rot,
+            "rotation": rotation,
             "frame": frame
         }
 
-    # -------- TRANSLATION --------
     if action == "move":
-
-        if dist is not None and q_dist is not None:
+        if numeric_distance is not None and qualitative_distance is not None:
             return None
 
-        value = dist if dist is not None else q_dist
-
+        value = numeric_distance if numeric_distance is not None else qualitative_distance
         if value is None:
             return None
 
         direction = [0, 0, 0]
-
         if axis == "x":
             direction = [sign, 0, 0]
         elif axis == "y":
