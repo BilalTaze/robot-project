@@ -93,15 +93,23 @@ class RobotVoiceApp:
             self.root.after(0, self.update_ui, f"Error: {e}")
 
 
-    def record_voice(self, mic_index: int=0, timeout: int=5, phrase_time_limit: int=10) -> sr.AudioData:
-        """Records voice input from the specified microphone."""
+    def record_voice(self, mic_index: int=0, timeout: int=5, phrase_time_limit: int=20, pause_threshold: float=2) -> sr.AudioData:
+        """Records voice input from the specified microphone.
+        Parameters:
+            mic_index: Index of the microphone to use (default is 0).
+            timeout: Maximum time to wait for audio input (default is 5 seconds).
+            phrase_time_limit: Maximum time for a phrase to be recorded (default is 20 seconds).
+            pause_threshold: Minimum time of silence to consider the end of a phrase (default is 2 seconds).
+        Returns:
+            sr.AudioData: The recorded audio data.
+        """
     # Initialize microphone with the given index
         self.mic = sr.Microphone(device_index=mic_index)
         with self.mic as source:
         # Adjust for ambient noise in a separate thread
             threading.Thread(target=self.recognizer.adjust_for_ambient_noise, args=(source, 1)).start()
         # Listen for audio input with timeout and phrase limit
-            return self.recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
+            return self.recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit, pause_threshold=pause_threshold)
 
 
     def recognize_voice(self, audio, api: str = "whisper", language: str= 'en') -> str|list[str]:
