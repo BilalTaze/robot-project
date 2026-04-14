@@ -21,7 +21,7 @@ class SafetyManager:
         self.x_max = 0.45
 
         self.y_min = -0.45
-        self.y_max = -0.19
+        self.y_max = -0.25
 
         self.z_min = 0.10
         self.z_max = 0.40

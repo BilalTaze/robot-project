@@ -7,7 +7,6 @@ COMMANDS = {
         "go": "move",
         "rotate": "rotate",
         "turn": "rotate",
-        "stop": "stop",
         "sequence": "sequence",
         "run": "run",
         "clear": "clear"

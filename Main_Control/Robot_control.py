@@ -1,5 +1,6 @@
 import math
 import time
+import threading
 from rtde_control import RTDEControlInterface
 from rtde_receive import RTDEReceiveInterface
 from Safety import SafetyManager
@@ -7,47 +8,55 @@ from Safety import SafetyManager
 
 class RobotController:
     """
-    Main class responsible for controlling the robot using RTDE.
-    Handles:
-    - motion execution (move / rotate)
-    - coordinate transformations (tool ↔ base)
-    - safety checks before execution
+    Robot controller using RTDE.
+
+    Features:
+    - translation control
+    - rotation control
+    - base/tool frame support
+    - safety checks
+    - interruptible motion with speedL
     """
 
     def __init__(self, robot_ip: str):
-        # Initialize robot communication interfaces
         self.robot_ip = robot_ip
-        self.rtde_c = RTDEControlInterface(robot_ip)   # Control interface (commands)
-        self.rtde_r = RTDEReceiveInterface(robot_ip)   # Feedback interface (state)
-        self.safety = SafetyManager()                  # Safety system
+        self.rtde_c = RTDEControlInterface(robot_ip)
+        self.rtde_r = RTDEReceiveInterface(robot_ip)
+        self.safety = SafetyManager()
 
-    # -------- MATRIX OPERATIONS --------
+        self.stop_requested = False
+        self.motion_lock = threading.Lock()
+        self.is_moving = False
+
+    # ------------------------------------------------------------------
+    # Basic math helpers
+    # ------------------------------------------------------------------
 
     @staticmethod
     def mat_mul(A, B):
-        """Multiply two 3x3 matrices"""
         return [
             [sum(A[i][k] * B[k][j] for k in range(3)) for j in range(3)]
             for i in range(3)
         ]
 
     @staticmethod
+    def mat_transpose(A):
+        return [list(row) for row in zip(*A)]
+
+    @staticmethod
     def mat_vec_mul(R, v):
-        """Multiply a 3x3 matrix with a 3D vector"""
         return [
             R[0][0] * v[0] + R[0][1] * v[1] + R[0][2] * v[2],
             R[1][0] * v[0] + R[1][1] * v[1] + R[1][2] * v[2],
             R[2][0] * v[0] + R[2][1] * v[1] + R[2][2] * v[2],
         ]
 
-    # -------- ROTATION CONVERSIONS --------
+    # ------------------------------------------------------------------
+    # Rotation conversions
+    # ------------------------------------------------------------------
 
     @staticmethod
     def rotvec_to_matrix(rx, ry, rz):
-        """
-        Convert a rotation vector (axis-angle) to a rotation matrix.
-        Used to transform tool-frame movements into base-frame coordinates.
-        """
         theta = math.sqrt(rx * rx + ry * ry + rz * rz)
 
         if theta < 1e-12:
@@ -73,10 +82,6 @@ class RobotController:
 
     @staticmethod
     def matrix_to_rotvec(R):
-        """
-        Convert a rotation matrix back to a rotation vector.
-        Used after modifying orientation in RPY.
-        """
         trace = R[0][0] + R[1][1] + R[2][2]
         cos_theta = max(-1.0, min(1.0, (trace - 1.0) / 2.0))
         theta = math.acos(cos_theta)
@@ -93,9 +98,6 @@ class RobotController:
 
     @staticmethod
     def rpy_to_matrix(roll, pitch, yaw):
-        """
-        Convert Roll-Pitch-Yaw angles to a rotation matrix.
-        """
         cr = math.cos(roll)
         sr = math.sin(roll)
         cp = math.cos(pitch)
@@ -111,10 +113,6 @@ class RobotController:
 
     @staticmethod
     def matrix_to_rpy(R):
-        """
-        Convert a rotation matrix to Roll-Pitch-Yaw angles.
-        Used for intuitive rotation manipulation.
-        """
         pitch = math.asin(-R[2][0])
 
         if abs(math.cos(pitch)) > 1e-9:
@@ -128,145 +126,252 @@ class RobotController:
 
     @classmethod
     def rotvec_to_rpy(cls, rx, ry, rz):
-        """Convert rotation vector → RPY"""
         return cls.matrix_to_rpy(cls.rotvec_to_matrix(rx, ry, rz))
 
     @classmethod
     def rpy_to_rotvec(cls, roll, pitch, yaw):
-        """Convert RPY → rotation vector"""
         return cls.matrix_to_rotvec(cls.rpy_to_matrix(roll, pitch, yaw))
 
-    # -------- COMMAND EXECUTION --------
+    # ------------------------------------------------------------------
+    # Stop
+    # ------------------------------------------------------------------
 
-    def execute_command(self, cmd: dict):
-        """
-        Execute a parsed command:
-        - move → translation
-        - rotate → orientation change
-        - stop → emergency stop
-        """
-
-        if cmd is None:
-            return
-
-        action = cmd.get("action")
-        current_joints = self.rtde_r.getActualQ()
-
-        # -------- STOP COMMAND --------
-        if action == "stop":
+    def _stop_motion(self):
+        try:
             self.rtde_c.speedStop()
-            print("Robot stopped")
-            return
+        except Exception:
+            pass
 
-        # -------- SAFETY CHECK (JOINTS) --------
-        if not self.safety.is_joint_configuration_safe(current_joints):
-            print("Unsafe joint configuration: command cancelled")
-            return
+        try:
+            self.rtde_c.stopL(1.0)
+        except Exception:
+            pass
 
-        # -------- ROTATION --------
-        if action == "rotate":
-            rotation = cmd.get("rotation")
+        self.stop_requested = False
+        print("Robot stopped")
 
-            if rotation is None or len(rotation) != 3:
-                return
+    # ------------------------------------------------------------------
+    # Safety helpers
+    # ------------------------------------------------------------------
 
-            # Check rotation limits
-            if not self.safety.is_rotation_step_safe(rotation):
-                print("Rotation too large: command cancelled")
-                return
+    def _is_target_safe(self, target_pose, motion_name="movement"):
+        if not self.safety.is_pose_safe(target_pose):
+            print(f"Target outside workspace: {motion_name} cancelled")
+            return False
 
-            # Get current pose
-            pose = self.rtde_r.getActualTCPPose()
-            target_pose = pose.copy()
+        if not self.safety.is_reach_safe(target_pose):
+            print(f"Reach limit exceeded: {motion_name} cancelled")
+            return False
 
-            # Convert to RPY for intuitive manipulation
-            roll, pitch, yaw = self.rotvec_to_rpy(
-                pose[3], pose[4], pose[5]
-            )
+        return True
 
-            # Apply rotation
-            roll += rotation[0]
-            pitch += rotation[1]
-            yaw += rotation[2]
+    # ------------------------------------------------------------------
+    # Target builders
+    # ------------------------------------------------------------------
 
-            # Convert back to rotation vector
-            rv = self.rpy_to_rotvec(roll, pitch, yaw)
-
-            target_pose[3] = rv[0]
-            target_pose[4] = rv[1]
-            target_pose[5] = rv[2]
-
-            # Safety checks
-            if not self.safety.is_pose_safe(target_pose):
-                print("Target outside workspace: rotation cancelled")
-                return
-
-            if not self.safety.is_reach_safe(target_pose):
-                print("Reach limit exceeded: rotation cancelled")
-                return
-
-            # Execute movement
-            self.rtde_c.moveL(target_pose, 0.10, 0.10)
-            time.sleep(0.3)
-            return
-
-        # -------- TRANSLATION --------
-        if action != "move":
-            return
-
-        direction = cmd.get("direction")
-        distance = cmd.get("distance")
-        frame = cmd.get("frame", "tool")
-
-        if direction is None or len(direction) != 3:
-            return
-
-        if distance is None:
-            return
-
-        # Check translation limits
-        if not self.safety.is_translation_step_safe(distance):
-            print("Translation too large: command cancelled")
-            return
-
-        # Get current pose
-        pose = self.rtde_r.getActualTCPPose()
+    def _build_translation_target(self, pose, direction, distance, frame):
         target_pose = pose.copy()
 
         dx = direction[0] * distance
         dy = direction[1] * distance
         dz = direction[2] * distance
 
-        # -------- FRAME HANDLING --------
         if frame == "base":
-            # Direct movement in world frame
             target_pose[0] += dx
             target_pose[1] += dy
             target_pose[2] += dz
         else:
-            # Movement relative to tool orientation
             rx, ry, rz = pose[3], pose[4], pose[5]
             R = self.rotvec_to_matrix(rx, ry, rz)
-
             v_base = self.mat_vec_mul(R, [dx, dy, dz])
 
             target_pose[0] += v_base[0]
             target_pose[1] += v_base[1]
             target_pose[2] += v_base[2]
 
-        # Safety checks
-        if not self.safety.is_pose_safe(target_pose):
-            print("Target outside workspace: movement cancelled")
-            return
+        return target_pose
 
-        if not self.safety.is_reach_safe(target_pose):
-            print("Reach limit exceeded: movement cancelled")
-            return
+    def _build_rotation_target(self, pose, rotation):
+        target_pose = pose.copy()
 
-        # Execute movement
-        self.rtde_c.moveL(target_pose, 0.10, 0.10)
-        time.sleep(0.3)
+        roll, pitch, yaw = self.rotvec_to_rpy(
+            pose[3], pose[4], pose[5]
+        )
+
+        roll += rotation[0]
+        pitch += rotation[1]
+        yaw += rotation[2]
+
+        rv = self.rpy_to_rotvec(roll, pitch, yaw)
+        target_pose[3] = rv[0]
+        target_pose[4] = rv[1]
+        target_pose[5] = rv[2]
+
+        return target_pose
+
+    # ------------------------------------------------------------------
+    # Motion execution
+    # ------------------------------------------------------------------
+
+    def _speedL_move_to_target(
+        self,
+        target_pose,
+        speed=0.08,
+        acc=0.30,
+        dt=0.02,
+        pos_tolerance=0.002,
+    ):
+        max_iters = 1000
+
+        for _ in range(max_iters):
+            if self.stop_requested:
+                self._stop_motion()
+                return False
+
+            current_pose = self.rtde_r.getActualTCPPose()
+
+            ex = target_pose[0] - current_pose[0]
+            ey = target_pose[1] - current_pose[1]
+            ez = target_pose[2] - current_pose[2]
+
+            dist = math.sqrt(ex * ex + ey * ey + ez * ez)
+
+            if dist < pos_tolerance:
+                self.rtde_c.speedStop()
+                return True
+
+            ux = ex / dist
+            uy = ey / dist
+            uz = ez / dist
+
+            vx = ux * speed
+            vy = uy * speed
+            vz = uz * speed
+
+            self.rtde_c.speedL([vx, vy, vz, 0.0, 0.0, 0.0], acc, dt)
+            time.sleep(dt)
+
+        self.rtde_c.speedStop()
+        print("Target not reached within iteration limit")
+        return False
+
+    def _speedL_rotate_to_target(
+        self,
+        target_pose,
+        angular_speed=0.5,
+        acc=1.0,
+        dt=0.02,
+        angle_tolerance=0.01,
+    ):
+        max_iters = 1000
+
+        for _ in range(max_iters):
+            if self.stop_requested:
+                self._stop_motion()
+                return False
+
+            current_pose = self.rtde_r.getActualTCPPose()
+
+            Rc = self.rotvec_to_matrix(
+                current_pose[3], current_pose[4], current_pose[5]
+            )
+            Rt = self.rotvec_to_matrix(
+                target_pose[3], target_pose[4], target_pose[5]
+            )
+
+            Re = self.mat_mul(Rt, self.mat_transpose(Rc))
+            err_vec = self.matrix_to_rotvec(Re)
+
+            ex, ey, ez = err_vec
+            angle_error = math.sqrt(ex * ex + ey * ey + ez * ez)
+
+            if angle_error < angle_tolerance:
+                self.rtde_c.speedStop()
+                return True
+
+            ux = ex / angle_error
+            uy = ey / angle_error
+            uz = ez / angle_error
+
+            wx = ux * angular_speed
+            wy = uy * angular_speed
+            wz = uz * angular_speed
+
+            self.rtde_c.speedL([0.0, 0.0, 0.0, wx, wy, wz], acc, dt)
+            time.sleep(dt)
+
+        self.rtde_c.speedStop()
+        print("Rotation target not reached within iteration limit")
+        return False
+
+    # ------------------------------------------------------------------
+    # Public command execution
+    # ------------------------------------------------------------------
+
+    def execute_command(self, cmd: dict):
+        if cmd is None:
+            return False
+
+        with self.motion_lock:
+            self.is_moving = True
+            try:
+                action = cmd.get("action")
+                current_joints = self.rtde_r.getActualQ()
+
+                if not self.safety.is_joint_configuration_safe(current_joints):
+                    print("Unsafe joint configuration: command cancelled")
+                    return False
+
+                if action == "rotate":
+                    rotation = cmd.get("rotation")
+
+                    if rotation is None or len(rotation) != 3:
+                        return False
+
+                    if not self.safety.is_rotation_step_safe(rotation):
+                        print("Rotation too large: command cancelled")
+                        return False
+
+                    pose = self.rtde_r.getActualTCPPose()
+                    target_pose = self._build_rotation_target(pose, rotation)
+
+                    if not self._is_target_safe(target_pose, "rotation"):
+                        return False
+
+                    return self._speedL_rotate_to_target(target_pose)
+
+                if action != "move":
+                    return False
+
+                direction = cmd.get("direction")
+                distance = cmd.get("distance")
+                frame = cmd.get("frame", "tool")
+
+                if direction is None or len(direction) != 3:
+                    return False
+
+                if distance is None:
+                    return False
+
+                if not self.safety.is_translation_step_safe(distance):
+                    print("Translation too large: command cancelled")
+                    return False
+
+                pose = self.rtde_r.getActualTCPPose()
+                target_pose = self._build_translation_target(
+                    pose, direction, distance, frame
+                )
+
+                if not self._is_target_safe(target_pose, "movement"):
+                    return False
+
+                return self._speedL_move_to_target(target_pose)
+
+            finally:
+                self.is_moving = False
 
     def close(self):
-        """Stop robot script properly"""
-        self.rtde_c.stopScript()
+        try:
+            self.rtde_c.stopScript()
+        except Exception:
+            pass
