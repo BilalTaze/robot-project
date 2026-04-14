@@ -6,14 +6,26 @@ from Safety import SafetyManager
 
 
 class RobotController:
+    """
+    Main class responsible for controlling the robot using RTDE.
+    Handles:
+    - motion execution (move / rotate)
+    - coordinate transformations (tool ↔ base)
+    - safety checks before execution
+    """
+
     def __init__(self, robot_ip: str):
+        # Initialize robot communication interfaces
         self.robot_ip = robot_ip
-        self.rtde_c = RTDEControlInterface(robot_ip)
-        self.rtde_r = RTDEReceiveInterface(robot_ip)
-        self.safety = SafetyManager()
+        self.rtde_c = RTDEControlInterface(robot_ip)   # Control interface (commands)
+        self.rtde_r = RTDEReceiveInterface(robot_ip)   # Feedback interface (state)
+        self.safety = SafetyManager()                  # Safety system
+
+    # -------- MATRIX OPERATIONS --------
 
     @staticmethod
     def mat_mul(A, B):
+        """Multiply two 3x3 matrices"""
         return [
             [sum(A[i][k] * B[k][j] for k in range(3)) for j in range(3)]
             for i in range(3)
@@ -21,14 +33,21 @@ class RobotController:
 
     @staticmethod
     def mat_vec_mul(R, v):
+        """Multiply a 3x3 matrix with a 3D vector"""
         return [
             R[0][0] * v[0] + R[0][1] * v[1] + R[0][2] * v[2],
             R[1][0] * v[0] + R[1][1] * v[1] + R[1][2] * v[2],
             R[2][0] * v[0] + R[2][1] * v[1] + R[2][2] * v[2],
         ]
 
+    # -------- ROTATION CONVERSIONS --------
+
     @staticmethod
     def rotvec_to_matrix(rx, ry, rz):
+        """
+        Convert a rotation vector (axis-angle) to a rotation matrix.
+        Used to transform tool-frame movements into base-frame coordinates.
+        """
         theta = math.sqrt(rx * rx + ry * ry + rz * rz)
 
         if theta < 1e-12:
@@ -54,6 +73,10 @@ class RobotController:
 
     @staticmethod
     def matrix_to_rotvec(R):
+        """
+        Convert a rotation matrix back to a rotation vector.
+        Used after modifying orientation in RPY.
+        """
         trace = R[0][0] + R[1][1] + R[2][2]
         cos_theta = max(-1.0, min(1.0, (trace - 1.0) / 2.0))
         theta = math.acos(cos_theta)
@@ -70,6 +93,9 @@ class RobotController:
 
     @staticmethod
     def rpy_to_matrix(roll, pitch, yaw):
+        """
+        Convert Roll-Pitch-Yaw angles to a rotation matrix.
+        """
         cr = math.cos(roll)
         sr = math.sin(roll)
         cp = math.cos(pitch)
@@ -77,26 +103,18 @@ class RobotController:
         cy = math.cos(yaw)
         sy = math.sin(yaw)
 
-        Rx = [
-            [1, 0, 0],
-            [0, cr, -sr],
-            [0, sr, cr],
-        ]
-        Ry = [
-            [cp, 0, sp],
-            [0, 1, 0],
-            [-sp, 0, cp],
-        ]
-        Rz = [
-            [cy, -sy, 0],
-            [sy, cy, 0],
-            [0, 0, 1],
-        ]
+        Rx = [[1, 0, 0], [0, cr, -sr], [0, sr, cr]]
+        Ry = [[cp, 0, sp], [0, 1, 0], [-sp, 0, cp]]
+        Rz = [[cy, -sy, 0], [sy, cy, 0], [0, 0, 1]]
 
         return RobotController.mat_mul(Rz, RobotController.mat_mul(Ry, Rx))
 
     @staticmethod
     def matrix_to_rpy(R):
+        """
+        Convert a rotation matrix to Roll-Pitch-Yaw angles.
+        Used for intuitive rotation manipulation.
+        """
         pitch = math.asin(-R[2][0])
 
         if abs(math.cos(pitch)) > 1e-9:
@@ -110,130 +128,89 @@ class RobotController:
 
     @classmethod
     def rotvec_to_rpy(cls, rx, ry, rz):
-        R = cls.rotvec_to_matrix(rx, ry, rz)
-        return cls.matrix_to_rpy(R)
+        """Convert rotation vector → RPY"""
+        return cls.matrix_to_rpy(cls.rotvec_to_matrix(rx, ry, rz))
 
     @classmethod
     def rpy_to_rotvec(cls, roll, pitch, yaw):
-        R = cls.rpy_to_matrix(roll, pitch, yaw)
-        return cls.matrix_to_rotvec(R)
+        """Convert RPY → rotation vector"""
+        return cls.matrix_to_rotvec(cls.rpy_to_matrix(roll, pitch, yaw))
 
-    @staticmethod
-    def rad_to_deg(rad_value):
-        return rad_value * 180.0 / math.pi
-
-    def print_rpy_deg(self, label, pose):
-        roll, pitch, yaw = self.rotvec_to_rpy(pose[3], pose[4], pose[5])
-        print(f"\n--- {label} RPY (deg) ---")
-        print(
-            f"Roll: {self.rad_to_deg(roll):.2f}, "
-            f"Pitch: {self.rad_to_deg(pitch):.2f}, "
-            f"Yaw: {self.rad_to_deg(yaw):.2f}"
-        )
+    # -------- COMMAND EXECUTION --------
 
     def execute_command(self, cmd: dict):
+        """
+        Execute a parsed command:
+        - move → translation
+        - rotate → orientation change
+        - stop → emergency stop
+        """
+
         if cmd is None:
             return
 
         action = cmd.get("action")
         current_joints = self.rtde_r.getActualQ()
 
+        # -------- STOP COMMAND --------
         if action == "stop":
             self.rtde_c.speedStop()
             print("Robot stopped")
             return
 
+        # -------- SAFETY CHECK (JOINTS) --------
         if not self.safety.is_joint_configuration_safe(current_joints):
             print("Unsafe joint configuration: command cancelled")
             return
 
+        # -------- ROTATION --------
         if action == "rotate":
             rotation = cmd.get("rotation")
 
             if rotation is None or len(rotation) != 3:
                 return
 
+            # Check rotation limits
             if not self.safety.is_rotation_step_safe(rotation):
-                print("Rotation step too large: command cancelled")
+                print("Rotation too large: command cancelled")
                 return
 
-            pose_before = self.rtde_r.getActualTCPPose()
+            # Get current pose
+            pose = self.rtde_r.getActualTCPPose()
+            target_pose = pose.copy()
 
-            print("\n--- BEFORE ROTATION (rotvec) ---")
-            print(
-                f"Rx: {pose_before[3]:.4f}, "
-                f"Ry: {pose_before[4]:.4f}, "
-                f"Rz: {pose_before[5]:.4f}"
-            )
-            self.print_rpy_deg("BEFORE", pose_before)
-
-            target_pose = pose_before.copy()
-
+            # Convert to RPY for intuitive manipulation
             roll, pitch, yaw = self.rotvec_to_rpy(
-                pose_before[3], pose_before[4], pose_before[5]
+                pose[3], pose[4], pose[5]
             )
 
+            # Apply rotation
             roll += rotation[0]
             pitch += rotation[1]
             yaw += rotation[2]
 
+            # Convert back to rotation vector
             rv = self.rpy_to_rotvec(roll, pitch, yaw)
 
             target_pose[3] = rv[0]
             target_pose[4] = rv[1]
             target_pose[5] = rv[2]
 
+            # Safety checks
             if not self.safety.is_pose_safe(target_pose):
-                print("Target pose outside safety workspace: rotation cancelled")
+                print("Target outside workspace: rotation cancelled")
                 return
 
             if not self.safety.is_reach_safe(target_pose):
-                print("Target pose exceeds safe reach: rotation cancelled")
+                print("Reach limit exceeded: rotation cancelled")
                 return
 
-            print("\n--- TARGET ROTATION (rotvec) ---")
-            print(
-                f"Rx: {target_pose[3]:.4f}, "
-                f"Ry: {target_pose[4]:.4f}, "
-                f"Rz: {target_pose[5]:.4f}"
-            )
-            self.print_rpy_deg("TARGET", target_pose)
-
+            # Execute movement
             self.rtde_c.moveL(target_pose, 0.10, 0.10)
-            time.sleep(0.5)
-
-            pose_after = self.rtde_r.getActualTCPPose()
-
-            print("\n--- AFTER ROTATION (rotvec) ---")
-            print(
-                f"Rx: {pose_after[3]:.4f}, "
-                f"Ry: {pose_after[4]:.4f}, "
-                f"Rz: {pose_after[5]:.4f}"
-            )
-            self.print_rpy_deg("AFTER", pose_after)
-
-            print("\n--- DELTA ROTATION (rotvec) ---")
-            print(
-                f"dRx: {pose_after[3] - pose_before[3]:.4f}, "
-                f"dRy: {pose_after[4] - pose_before[4]:.4f}, "
-                f"dRz: {pose_after[5] - pose_before[5]:.4f}"
-            )
-
-            roll_before, pitch_before, yaw_before = self.rotvec_to_rpy(
-                pose_before[3], pose_before[4], pose_before[5]
-            )
-            roll_after, pitch_after, yaw_after = self.rotvec_to_rpy(
-                pose_after[3], pose_after[4], pose_after[5]
-            )
-
-            print("\n--- DELTA RPY (deg) ---")
-            print(
-                f"dRoll: {self.rad_to_deg(roll_after - roll_before):.2f}, "
-                f"dPitch: {self.rad_to_deg(pitch_after - pitch_before):.2f}, "
-                f"dYaw: {self.rad_to_deg(yaw_after - yaw_before):.2f}"
-            )
+            time.sleep(0.3)
             return
 
+        # -------- TRANSLATION --------
         if action != "move":
             return
 
@@ -247,77 +224,49 @@ class RobotController:
         if distance is None:
             return
 
+        # Check translation limits
         if not self.safety.is_translation_step_safe(distance):
-            print("Translation step too large: command cancelled")
+            print("Translation too large: command cancelled")
             return
 
-        pose_before = self.rtde_r.getActualTCPPose()
-
-        print("\n--- BEFORE ---")
-        print(
-            f"X: {pose_before[0]:.4f}, "
-            f"Y: {pose_before[1]:.4f}, "
-            f"Z: {pose_before[2]:.4f}"
-        )
+        # Get current pose
+        pose = self.rtde_r.getActualTCPPose()
+        target_pose = pose.copy()
 
         dx = direction[0] * distance
         dy = direction[1] * distance
         dz = direction[2] * distance
 
-        target_pose = pose_before.copy()
-
+        # -------- FRAME HANDLING --------
         if frame == "base":
+            # Direct movement in world frame
             target_pose[0] += dx
             target_pose[1] += dy
             target_pose[2] += dz
         else:
-            rx, ry, rz = pose_before[3], pose_before[4], pose_before[5]
+            # Movement relative to tool orientation
+            rx, ry, rz = pose[3], pose[4], pose[5]
             R = self.rotvec_to_matrix(rx, ry, rz)
 
-            v_tool = [dx, dy, dz]
-            v_base = self.mat_vec_mul(R, v_tool)
+            v_base = self.mat_vec_mul(R, [dx, dy, dz])
 
             target_pose[0] += v_base[0]
             target_pose[1] += v_base[1]
             target_pose[2] += v_base[2]
 
+        # Safety checks
         if not self.safety.is_pose_safe(target_pose):
-            print("Target pose outside safety workspace: movement cancelled")
+            print("Target outside workspace: movement cancelled")
             return
 
         if not self.safety.is_reach_safe(target_pose):
-            print("Target pose exceeds safe reach: movement cancelled")
+            print("Reach limit exceeded: movement cancelled")
             return
 
-        print("\n--- TARGET ---")
-        print(
-            f"X: {target_pose[0]:.4f}, "
-            f"Y: {target_pose[1]:.4f}, "
-            f"Z: {target_pose[2]:.4f}"
-        )
-
+        # Execute movement
         self.rtde_c.moveL(target_pose, 0.10, 0.10)
-        time.sleep(0.5)
-
-        pose_after = self.rtde_r.getActualTCPPose()
-
-        print("\n--- AFTER ---")
-        print(
-            f"X: {pose_after[0]:.4f}, "
-            f"Y: {pose_after[1]:.4f}, "
-            f"Z: {pose_after[2]:.4f}"
-        )
-
-        dx_real = pose_after[0] - pose_before[0]
-        dy_real = pose_after[1] - pose_before[1]
-        dz_real = pose_after[2] - pose_before[2]
-
-        print("\n--- DELTA ---")
-        print(
-            f"dX: {dx_real:.4f}, "
-            f"dY: {dy_real:.4f}, "
-            f"dZ: {dz_real:.4f}"
-        )
+        time.sleep(0.3)
 
     def close(self):
+        """Stop robot script properly"""
         self.rtde_c.stopScript()

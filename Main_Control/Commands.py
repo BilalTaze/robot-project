@@ -1,4 +1,7 @@
+# Dictionary mapping words to robot command parameters
 COMMANDS = {
+
+    # Type of command
     "action": {
         "move": "move",
         "go": "move",
@@ -10,12 +13,14 @@ COMMANDS = {
         "clear": "clear"
     },
 
+    # Axis definitions (Cartesian axes)
     "axis": {
         "x": "x",
         "y": "y",
         "z": "z"
     },
 
+    # Direction sign (positive or negative movement)
     "sign": {
         "plus": 1,
         "positive": 1,
@@ -25,23 +30,24 @@ COMMANDS = {
         "-": -1
     },
 
-    # translation
+    # Predefined translation distances (in meters)
     "distance": {
         "small": 0.02,
         "medium": 0.05,
         "far": 0.10
     },
 
-    # rotation (en radians approx)
+    # Predefined rotation angles (in radians)
     "angle": {
         "small": 0.1,
         "medium": 0.3,
         "far": 0.6
     },
 
+    # Reference frames
     "frame": {
-        "base": "base",
-        "tool": "tool",
+        "base": "base",   # world reference frame
+        "tool": "tool",   # end-effector frame
         "tcp": "tool"
     }
 }
