@@ -9,6 +9,8 @@ def main():
     robot = RobotController(ROBOT_IP)
     sequence = SequenceManager()
 
+    current_frame = "tool"  # mode par défaut
+
     try:
         while True:
             sentence = input("Enter command: ")
@@ -24,6 +26,13 @@ def main():
 
             action = cmd.get("action")
 
+            # -------- FRAME MODE --------
+            if action == "set_frame":
+                current_frame = cmd.get("frame")
+                print(f"Frame set to: {current_frame}")
+                continue
+
+            # -------- SEQUENCE --------
             if action == "sequence_mode":
                 sequence.start_sequence_mode()
                 print("Sequence mode activated")
@@ -45,6 +54,11 @@ def main():
                 print("Sequence finished")
                 continue
 
+            # -------- APPLY GLOBAL FRAME --------
+            if cmd.get("frame") is None:
+                cmd["frame"] = current_frame
+
+            # -------- EXECUTION --------
             if sequence.is_active():
                 sequence.add_command(cmd)
                 print("Command added to sequence")

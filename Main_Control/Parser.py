@@ -7,7 +7,14 @@ def parse_command(sentence):
     s = sentence.lower().replace("-", " ").strip()
     words = s.split()
 
-    # commandes spéciales séquence
+    # -------- FRAME MODE --------
+    if s == "frame base":
+        return {"action": "set_frame", "frame": "base"}
+
+    if s == "frame tool":
+        return {"action": "set_frame", "frame": "tool"}
+
+    # -------- SEQUENCE COMMANDS --------
     if s == "sequence mode":
         return {"action": "sequence_mode"}
 
@@ -20,7 +27,7 @@ def parse_command(sentence):
     action = None
     axis = None
     sign = None
-    frame = "tool"
+    frame = None  # ⚠️ IMPORTANT : plus de valeur par défaut
 
     qualitative_distance = None
     qualitative_angle = None
@@ -55,6 +62,7 @@ def parse_command(sentence):
     if axis is None or sign is None or action is None:
         return None
 
+    # -------- ROTATION --------
     if action == "rotate":
         if numeric_angle is not None and qualitative_angle is not None:
             return None
@@ -64,6 +72,7 @@ def parse_command(sentence):
             return None
 
         rotation = [0, 0, 0]
+
         if axis == "x":
             rotation = [sign * value, 0, 0]
         elif axis == "y":
@@ -77,6 +86,7 @@ def parse_command(sentence):
             "frame": frame
         }
 
+    # -------- TRANSLATION --------
     if action == "move":
         if numeric_distance is not None and qualitative_distance is not None:
             return None
@@ -86,6 +96,7 @@ def parse_command(sentence):
             return None
 
         direction = [0, 0, 0]
+
         if axis == "x":
             direction = [sign, 0, 0]
         elif axis == "y":
