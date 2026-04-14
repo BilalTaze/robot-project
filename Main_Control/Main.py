@@ -70,6 +70,16 @@ def main():
                 sequence.stop_sequence_mode()
                 print("Sequence finished")
                 continue
+            
+            if action == "show_sequence":
+                commands = sequence.get_commands()
+                if not commands:
+                    print("Sequence is empty")
+                else:
+                    print("Current sequence:")
+                for i, cmd in enumerate(commands, 1):
+                    print(f"{i}. {cmd}")
+                continue
 
             # -------- APPLY GLOBAL FRAME --------
             # If no frame is specified in the command, use the current global frame

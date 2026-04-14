@@ -36,6 +36,10 @@ def parse_command(sentence):
     # Clear stored sequence
     if s == "clear sequence":
         return {"action": "clear_sequence"}
+    
+    # -------- SHOW SEQUENCE --------
+    if s == "show sequence":
+        return {"action": "show_sequence"}
 
     # -------- INITIAL VARIABLES --------
     action = None
