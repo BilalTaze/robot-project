@@ -2,6 +2,7 @@ import math
 import time
 from rtde_control import RTDEControlInterface
 from rtde_receive import RTDEReceiveInterface
+from Safety import SafetyManager
 
 
 class RobotController:
@@ -9,6 +10,7 @@ class RobotController:
         self.robot_ip = robot_ip
         self.rtde_c = RTDEControlInterface(robot_ip)
         self.rtde_r = RTDEReceiveInterface(robot_ip)
+        self.safety = SafetyManager()
 
     @staticmethod
     def mat_mul(A, B):
@@ -134,17 +136,25 @@ class RobotController:
             return
 
         action = cmd.get("action")
+        current_joints = self.rtde_r.getActualQ()
 
         if action == "stop":
             self.rtde_c.speedStop()
             print("Robot stopped")
             return
 
+        if not self.safety.is_joint_configuration_safe(current_joints):
+            print("Unsafe joint configuration: command cancelled")
+            return
+
         if action == "rotate":
             rotation = cmd.get("rotation")
-            frame = cmd.get("frame", "tool")
 
             if rotation is None or len(rotation) != 3:
+                return
+
+            if not self.safety.is_rotation_step_safe(rotation):
+                print("Rotation step too large: command cancelled")
                 return
 
             pose_before = self.rtde_r.getActualTCPPose()
@@ -172,6 +182,14 @@ class RobotController:
             target_pose[3] = rv[0]
             target_pose[4] = rv[1]
             target_pose[5] = rv[2]
+
+            if not self.safety.is_pose_safe(target_pose):
+                print("Target pose outside safety workspace: rotation cancelled")
+                return
+
+            if not self.safety.is_reach_safe(target_pose):
+                print("Target pose exceeds safe reach: rotation cancelled")
+                return
 
             print("\n--- TARGET ROTATION (rotvec) ---")
             print(
@@ -229,6 +247,10 @@ class RobotController:
         if distance is None:
             return
 
+        if not self.safety.is_translation_step_safe(distance):
+            print("Translation step too large: command cancelled")
+            return
+
         pose_before = self.rtde_r.getActualTCPPose()
 
         print("\n--- BEFORE ---")
@@ -258,6 +280,14 @@ class RobotController:
             target_pose[0] += v_base[0]
             target_pose[1] += v_base[1]
             target_pose[2] += v_base[2]
+
+        if not self.safety.is_pose_safe(target_pose):
+            print("Target pose outside safety workspace: movement cancelled")
+            return
+
+        if not self.safety.is_reach_safe(target_pose):
+            print("Target pose exceeds safe reach: movement cancelled")
+            return
 
         print("\n--- TARGET ---")
         print(
