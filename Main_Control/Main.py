@@ -1,7 +1,8 @@
+import threading
 from Parser import parse_command
 from Robot_control import RobotController
 from Sequence_manager import SequenceManager
-import threading
+from robot_voice_app import RobotVoiceApp
 
 # Robot IP address
 ROBOT_IP = "192.168.1.109"
@@ -28,7 +29,8 @@ def main():
         # Main interactive loop
         while True:
             # Read user input
-            sentence = input("Enter command: ").strip().lower()
+            app = RobotVoiceApp()
+            sentence = app.main()  # Get the recognized command from the voice app
 
             # Exit condition
             if sentence in ["quit", "exit"]:
