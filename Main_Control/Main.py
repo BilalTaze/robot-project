@@ -21,7 +21,7 @@ def main():
     # Initialize robot controller and sequence manager
     robot = RobotController(ROBOT_IP)
     sequence = SequenceManager()
-
+    app = RobotVoiceApp()
     # Default reference frame (tool frame)
     current_frame = "tool"
 
@@ -29,7 +29,6 @@ def main():
         # Main interactive loop
         while True:
             # Read user input
-            app = RobotVoiceApp()
             sentence = app.main()  # Get the recognized command from the voice app
 
             # Exit condition
