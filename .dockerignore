@@ -1,0 +1,14 @@
+# Environnement et Git
+.git
+.gitignore
+.env
+.venv
+.vscode
+
+# Fichiers de développement Python
+__pycache__
+*.pyc
+
+# Fichiers lourds ou en cours de développement
+experiment_harvard.wav
+test_voice_recording.pys

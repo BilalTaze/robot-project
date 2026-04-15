@@ -1,2 +1,4 @@
 venvProjet/
 __pycache__/
+*.pyc
+.vscode/
