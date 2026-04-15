@@ -249,7 +249,9 @@ class RobotVoiceApp:
     def main(self):
         """Starts the Tkinter main loop and waits for a command to be confirmed."""
         self.root.mainloop()
-        return self.command
+        if self.command_confirmed:
+            self.command_confirmed = False  # Reset the confirmation flag for the next command
+            return self.command
 
 
 if __name__ == "__main__":
@@ -257,5 +259,4 @@ if __name__ == "__main__":
     app = RobotVoiceApp()
     while True:
         command = app.main()  # Get the recognized command from the voice app
-        if app.command_confirmed:
-            print(f"Confirmed command: {command}")
+        print(f"Confirmed command: {command}")
