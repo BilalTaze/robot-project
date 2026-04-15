@@ -19,13 +19,21 @@ class RobotController:
     """
 
     def __init__(self, robot_ip: str):
+        # Initialize RTDE interfaces (control + feedback)
         self.robot_ip = robot_ip
         self.rtde_c = RTDEControlInterface(robot_ip)
         self.rtde_r = RTDEReceiveInterface(robot_ip)
+
+        # Safety manager (workspace, reach, joints)
         self.safety = SafetyManager()
 
+        # Flag used to stop motion from outside (main thread)
         self.stop_requested = False
+
+        # Lock to prevent multiple simultaneous motions
         self.motion_lock = threading.Lock()
+
+        # Indicates if robot is currently moving
         self.is_moving = False
 
     # ------------------------------------------------------------------
@@ -34,6 +42,7 @@ class RobotController:
 
     @staticmethod
     def mat_mul(A, B):
+        # Multiply two 3x3 matrices
         return [
             [sum(A[i][k] * B[k][j] for k in range(3)) for j in range(3)]
             for i in range(3)
@@ -41,10 +50,12 @@ class RobotController:
 
     @staticmethod
     def mat_transpose(A):
+        # Transpose a 3x3 matrix
         return [list(row) for row in zip(*A)]
 
     @staticmethod
     def mat_vec_mul(R, v):
+        # Multiply a matrix with a 3D vector
         return [
             R[0][0] * v[0] + R[0][1] * v[1] + R[0][2] * v[2],
             R[1][0] * v[0] + R[1][1] * v[1] + R[1][2] * v[2],
@@ -57,6 +68,7 @@ class RobotController:
 
     @staticmethod
     def rotvec_to_matrix(rx, ry, rz):
+        # Convert rotation vector (axis-angle) to rotation matrix
         theta = math.sqrt(rx * rx + ry * ry + rz * rz)
 
         if theta < 1e-12:
@@ -82,6 +94,7 @@ class RobotController:
 
     @staticmethod
     def matrix_to_rotvec(R):
+        # Convert rotation matrix to rotation vector
         trace = R[0][0] + R[1][1] + R[2][2]
         cos_theta = max(-1.0, min(1.0, (trace - 1.0) / 2.0))
         theta = math.acos(cos_theta)
@@ -98,6 +111,7 @@ class RobotController:
 
     @staticmethod
     def rpy_to_matrix(roll, pitch, yaw):
+        # Convert roll-pitch-yaw to rotation matrix
         cr = math.cos(roll)
         sr = math.sin(roll)
         cp = math.cos(pitch)
@@ -113,6 +127,7 @@ class RobotController:
 
     @staticmethod
     def matrix_to_rpy(R):
+        # Convert rotation matrix to roll-pitch-yaw
         pitch = math.asin(-R[2][0])
 
         if abs(math.cos(pitch)) > 1e-9:
@@ -126,10 +141,12 @@ class RobotController:
 
     @classmethod
     def rotvec_to_rpy(cls, rx, ry, rz):
+        # Convert rotation vector → RPY
         return cls.matrix_to_rpy(cls.rotvec_to_matrix(rx, ry, rz))
 
     @classmethod
     def rpy_to_rotvec(cls, roll, pitch, yaw):
+        # Convert RPY → rotation vector
         return cls.matrix_to_rotvec(cls.rpy_to_matrix(roll, pitch, yaw))
 
     # ------------------------------------------------------------------
@@ -137,6 +154,7 @@ class RobotController:
     # ------------------------------------------------------------------
 
     def _stop_motion(self):
+        # Stop robot immediately
         try:
             self.rtde_c.speedStop()
         except Exception:
@@ -155,10 +173,12 @@ class RobotController:
     # ------------------------------------------------------------------
 
     def _is_target_safe(self, target_pose, motion_name="movement"):
+        # Check workspace limits
         if not self.safety.is_pose_safe(target_pose):
             print(f"Target outside workspace: {motion_name} cancelled")
             return False
 
+        # Check reach limits
         if not self.safety.is_reach_safe(target_pose):
             print(f"Reach limit exceeded: {motion_name} cancelled")
             return False
@@ -170,6 +190,7 @@ class RobotController:
     # ------------------------------------------------------------------
 
     def _build_translation_target(self, pose, direction, distance, frame):
+        # Compute target position depending on frame (base or tool)
         target_pose = pose.copy()
 
         dx = direction[0] * distance
@@ -177,10 +198,12 @@ class RobotController:
         dz = direction[2] * distance
 
         if frame == "base":
+            # Direct movement in base frame
             target_pose[0] += dx
             target_pose[1] += dy
             target_pose[2] += dz
         else:
+            # Convert movement from tool frame to base frame
             rx, ry, rz = pose[3], pose[4], pose[5]
             R = self.rotvec_to_matrix(rx, ry, rz)
             v_base = self.mat_vec_mul(R, [dx, dy, dz])
@@ -192,6 +215,7 @@ class RobotController:
         return target_pose
 
     def _build_rotation_target(self, pose, rotation):
+        # Compute target orientation
         target_pose = pose.copy()
 
         roll, pitch, yaw = self.rotvec_to_rpy(
@@ -221,6 +245,7 @@ class RobotController:
         dt=0.02,
         pos_tolerance=0.002,
     ):
+        # Move to target position using speedL loop (interruptible)
         max_iters = 1000
 
         for _ in range(max_iters):
@@ -230,24 +255,29 @@ class RobotController:
 
             current_pose = self.rtde_r.getActualTCPPose()
 
+            # Compute position error
             ex = target_pose[0] - current_pose[0]
             ey = target_pose[1] - current_pose[1]
             ez = target_pose[2] - current_pose[2]
 
             dist = math.sqrt(ex * ex + ey * ey + ez * ez)
 
+            # Stop if close enough
             if dist < pos_tolerance:
                 self.rtde_c.speedStop()
                 return True
 
+            # Normalize direction
             ux = ex / dist
             uy = ey / dist
             uz = ez / dist
 
+            # Compute velocity
             vx = ux * speed
             vy = uy * speed
             vz = uz * speed
 
+            # Send speed command (translation only)
             self.rtde_c.speedL([vx, vy, vz, 0.0, 0.0, 0.0], acc, dt)
             time.sleep(dt)
 
@@ -263,6 +293,7 @@ class RobotController:
         dt=0.02,
         angle_tolerance=0.01,
     ):
+        # Rotate to target orientation using speedL loop
         max_iters = 1000
 
         for _ in range(max_iters):
@@ -272,6 +303,7 @@ class RobotController:
 
             current_pose = self.rtde_r.getActualTCPPose()
 
+            # Compute rotation matrices
             Rc = self.rotvec_to_matrix(
                 current_pose[3], current_pose[4], current_pose[5]
             )
@@ -279,24 +311,29 @@ class RobotController:
                 target_pose[3], target_pose[4], target_pose[5]
             )
 
+            # Compute rotation error
             Re = self.mat_mul(Rt, self.mat_transpose(Rc))
             err_vec = self.matrix_to_rotvec(Re)
 
             ex, ey, ez = err_vec
             angle_error = math.sqrt(ex * ex + ey * ey + ez * ez)
 
+            # Stop if angle is small enough
             if angle_error < angle_tolerance:
                 self.rtde_c.speedStop()
                 return True
 
+            # Normalize rotation axis
             ux = ex / angle_error
             uy = ey / angle_error
             uz = ez / angle_error
 
+            # Angular velocity
             wx = ux * angular_speed
             wy = uy * angular_speed
             wz = uz * angular_speed
 
+            # Send speed command (rotation only)
             self.rtde_c.speedL([0.0, 0.0, 0.0, wx, wy, wz], acc, dt)
             time.sleep(dt)
 
@@ -309,6 +346,7 @@ class RobotController:
     # ------------------------------------------------------------------
 
     def execute_command(self, cmd: dict):
+        # Execute parsed command (move or rotate)
         if cmd is None:
             return False
 
@@ -318,10 +356,12 @@ class RobotController:
                 action = cmd.get("action")
                 current_joints = self.rtde_r.getActualQ()
 
+                # Check joint safety before motion
                 if not self.safety.is_joint_configuration_safe(current_joints):
                     print("Unsafe joint configuration: command cancelled")
                     return False
 
+                # -------- ROTATION --------
                 if action == "rotate":
                     rotation = cmd.get("rotation")
 
@@ -340,6 +380,7 @@ class RobotController:
 
                     return self._speedL_rotate_to_target(target_pose)
 
+                # -------- TRANSLATION --------
                 if action != "move":
                     return False
 
@@ -371,6 +412,7 @@ class RobotController:
                 self.is_moving = False
 
     def close(self):
+        # Stop RTDE script properly
         try:
             self.rtde_c.stopScript()
         except Exception:

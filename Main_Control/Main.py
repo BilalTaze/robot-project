@@ -3,55 +3,78 @@ from Robot_control import RobotController
 from Sequence_manager import SequenceManager
 import threading
 
+# Robot IP address
 ROBOT_IP = "192.168.1.109"
 
 
 def main():
+    """
+    Main entry point of the application.
+    Handles:
+    - user input
+    - command parsing
+    - sequence management
+    - robot execution
+    """
+
+    # Initialize robot controller and sequence manager
     robot = RobotController(ROBOT_IP)
     sequence = SequenceManager()
 
+    # Default reference frame (tool frame)
     current_frame = "tool"
 
     try:
+        # Main interactive loop
         while True:
+            # Read user input
             sentence = input("Enter command: ").strip().lower()
 
+            # Exit condition
             if sentence in ["quit", "exit"]:
                 break
 
             # -------- STOP (handled ONLY here) --------
+            # Immediate stop command (interrupts current motion)
             if sentence == "stop":
                 robot.stop_requested = True
                 continue
 
+            # Parse natural language command into structured dict
             cmd = parse_command(sentence)
 
+            # Invalid command handling
             if cmd is None:
                 print("Invalid or incomplete command")
                 continue
 
+            # Extract action type
             action = cmd.get("action")
 
-            # -------- FRAME --------
+            # -------- FRAME MANAGEMENT --------
+            # Set global reference frame (base or tool)
             if action == "set_frame":
                 current_frame = cmd.get("frame")
                 print("Parsed command:", cmd)
                 print(f"Frame set to: {current_frame}")
                 continue
 
-            # -------- SEQUENCE --------
+            # -------- SEQUENCE MODE --------
+            # Activate sequence recording mode
             if action == "sequence_mode":
                 print("Parsed command:", cmd)
                 sequence.start_sequence_mode()
                 print("Sequence mode activated")
                 continue
 
+            # Clear stored sequence
             if action == "clear_sequence":
                 print("Parsed command:", cmd)
                 sequence.clear()
                 print("Sequence cleared")
                 continue
 
+            # Display stored sequence
             if action == "show_sequence":
                 commands = sequence.get_commands()
                 if not commands:
@@ -62,47 +85,60 @@ def main():
                         print(f"{i}. {c}")
                 continue
 
+            # -------- RUN SEQUENCE --------
+            # Execute stored sequence asynchronously
             if action == "run_sequence":
                 print("Parsed command:", cmd)
                 commands = sequence.get_commands()
                 print(f"Running sequence with {len(commands)} commands")
 
                 def worker():
+                    """
+                    Thread worker executing the sequence step by step.
+                    Handles stop and interruption.
+                    """
                     for c in commands:
-                        # Stop before next command starts
+                        # Stop requested before starting next command
                         if robot.stop_requested:
                             robot.stop_requested = False
                             print("Sequence interrupted")
                             break
 
+                        # Execute command
                         completed = robot.execute_command(c)
 
-                        # Stop or interruption during current command
+                        # If command failed or was interrupted → stop sequence
                         if not completed:
                             print("Sequence interrupted")
                             break
 
+                    # Exit sequence mode after execution
                     sequence.stop_sequence_mode()
                     print("Sequence finished")
 
+                # Run sequence in separate thread (non-blocking)
                 threading.Thread(target=worker, daemon=True).start()
                 continue
 
             # -------- APPLY FRAME --------
+            # Apply global frame if not specified in command
             if cmd.get("frame") is None:
                 cmd["frame"] = current_frame
 
             print("Parsed command:", cmd)
 
-            # -------- EXECUTE --------
+            # -------- EXECUTION --------
             if sequence.is_active():
+                # Add command to sequence instead of executing
                 sequence.add_command(cmd)
                 print("Command added to sequence")
             else:
+                # Prevent concurrent motion
                 if robot.is_moving:
                     print("Robot already moving")
                     continue
 
+                # Execute command in separate thread (non-blocking)
                 threading.Thread(
                     target=robot.execute_command,
                     args=(cmd,),
@@ -110,8 +146,10 @@ def main():
                 ).start()
 
     finally:
+        # Ensure robot is properly stopped when exiting program
         robot.close()
 
 
+# Entry point
 if __name__ == "__main__":
     main()
