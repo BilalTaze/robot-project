@@ -19,7 +19,7 @@ def main():
     """
 
     # Initialize robot controller and sequence manager
-    robot = RobotController(ROBOT_IP)
+    # robot = RobotController(ROBOT_IP)
     sequence = SequenceManager()
     app = RobotVoiceApp()
     # Default reference frame (tool frame)
@@ -46,7 +46,7 @@ def main():
 
             # Invalid command handling
             if cmd is None:
-                print("Invalid or incomplete command")
+                app.update_ui("Invalid or incomplete command")
                 continue
 
             # Extract action type

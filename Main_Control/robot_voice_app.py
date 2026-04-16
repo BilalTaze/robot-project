@@ -4,6 +4,7 @@ This script sets up a Tkinter GUI with a button to start recording and a text ar
 """
 
 import speech_recognition as sr
+print(sr.__version__)
 import whisper
 import numpy as np
 import torch
@@ -139,7 +140,7 @@ class RobotVoiceApp:
             return f"Error during recognition: {e}"
 
 
-    def update_ui(self, result):
+    def update_ui(self, activateButton: bool=True, result: str=""):
         """Updates the UI based on the recognition result."""
     # Re-enable the record button
         self.btn_listen.config(state="normal", text="Record")
@@ -149,17 +150,21 @@ class RobotVoiceApp:
             self.text_output.insert(tk.END, "Sorry, I didn't understand or hear anything.")
             self.label_status.config(text="Reception failed", fg="orange")
         else:
+        # Reset text output
+            self.text_output.delete("1.0", tk.END)
         # Command is displayed
-            self.text_output.insert(tk.END, f"Understood: {result}")
+            self.text_output.insert(tk.END, result)
         # Status is updated to indicate a command was received
             self.label_status.config(text="Command received!", fg="green")
-        # Show the confirm and cancel buttons
-            self.btn_cancel.pack()
-            self.confirm_frame.pack()
-        # Launch the confirm button animation
-            self.animate_confirm_button()
-        # After 4 seconds, if the user hasn't canceled, the command is confirmed automatically
-            self.confirm_timer = self.root.after(4000, self.command_confirmation)
+
+            if activateButton:
+            # Show the confirm and cancel buttons
+                self.btn_cancel.pack()
+                self.confirm_frame.pack()
+            # Launch the confirm button animation
+                self.animate_confirm_button()
+            # After 4 seconds, if the user hasn't canceled, the command is confirmed automatically
+                self.confirm_timer = self.root.after(4000, self.command_confirmation)
 
 
     def cancel_command(self):
@@ -259,4 +264,5 @@ if __name__ == "__main__":
     app = RobotVoiceApp()
     while True:
         command = app.main()  # Get the recognized command from the voice app
-        print(f"Confirmed command: {command}")
+        if app.command_confirmed:
+            print(f"Confirmed command: {command}")
