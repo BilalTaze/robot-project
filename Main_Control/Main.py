@@ -46,7 +46,7 @@ def main():
 
             # Invalid command handling
             if cmd is None:
-                app.update_ui("Invalid or incomplete command")
+                app.update_ui(activateButton=False, result="Invalid or incomplete command")
                 continue
 
             # Extract action type
