@@ -52,6 +52,8 @@ def main():
             if cmd is None:
                 app.update_ui(activateButton=False, result="Invalid or incomplete command")
                 continue
+            else:
+                app.update_ui(activateButton=True, result=f"Parsed command: {cmd}")
 
             # Extract action type
             action = cmd.get("action")

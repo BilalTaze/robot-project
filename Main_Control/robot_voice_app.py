@@ -86,6 +86,7 @@ class RobotVoiceApp:
 
         # Recognize speech using Whisper with English as the default language
             self.command = self.recognize_voice(audio, api="whisper", language='en')
+            print(self.command)
 
         # Update UI with the result
             self.root.after(0, self.update_ui, self.command)
@@ -123,8 +124,8 @@ class RobotVoiceApp:
                     audio_np = np.frombuffer(wav_data, np.int16).flatten().astype(np.float32) / 32768.0
 
                 # Transcribe audio using Whisper with the specified language
-                    result = self.model.transcribe(audio_np, fp16=torch.cuda.is_available(), language=language)
-                    return result["text"].strip()
+                    result = self.model.transcribe(audio_np, fp16=torch.cuda.is_available())
+                    return result.get("text", "")
 
                 case "google":
                 # Use Google's speech recognition API
@@ -139,13 +140,13 @@ class RobotVoiceApp:
             return f"Error during recognition: {e}"
 
 
-    def update_ui(self, activateButton: bool=True, result: str=""):
+    def update_ui(self, result, activateButton: bool=True):
         """Updates the UI based on the recognition result."""
     # Re-enable the record button
         self.btn_listen.config(state="normal", text="Record")
-
+        print(f"Recognition result: {result}")
     # Display error or result in the text area
-        if 'Error' in str(result) or result == "":
+        if result == "":
             self.text_output.insert(tk.END, "Sorry, I didn't understand or hear anything.")
             self.label_status.config(text="Reception failed", fg="orange")
         else:

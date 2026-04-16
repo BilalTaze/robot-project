@@ -90,6 +90,6 @@ def parse_commands_with_AI(sentence):
 
 if __name__ == "__main__":
     sentence = "Unix plus small"
-    result = parse_commands(sentence)
+    result = parse_commands_with_AI(sentence)
     print(type(result))
     print(result)
