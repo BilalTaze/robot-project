@@ -261,7 +261,8 @@ class RobotVoiceApp:
 if __name__ == "__main__":
     # Launch the application
     app = RobotVoiceApp()
-    while True:
-        command = app.main()  # Get the recognized command from the voice app
-        if app.command_confirmed:
-            print(f"Confirmed command: {command}")
+    app.root.mainloop()
+    # while True:
+    #     command = app.main()  # Get the recognized command from the voice app
+    #     if app.command_confirmed:
+    #         print(f"Confirmed command: {command}")
