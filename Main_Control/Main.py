@@ -5,7 +5,7 @@ from Sequence_manager import SequenceManager
 from robot_voice_app import RobotVoiceApp
 
 # Robot IP address
-ROBOT_IP = "10.220.8.217"
+ROBOT_IP = "172.20.10.2"
 
 
 def main():
