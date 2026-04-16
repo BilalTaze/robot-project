@@ -19,7 +19,7 @@ def main():
     """
 
     # Initialize robot controller and sequence manager
-    # robot = RobotController(ROBOT_IP)
+    robot = RobotController(ROBOT_IP)
     sequence = SequenceManager()
     app = RobotVoiceApp()
     # Default reference frame (tool frame)

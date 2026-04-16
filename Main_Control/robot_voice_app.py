@@ -4,7 +4,6 @@ This script sets up a Tkinter GUI with a button to start recording and a text ar
 """
 
 import speech_recognition as sr
-print(sr.__version__)
 import whisper
 import numpy as np
 import torch
