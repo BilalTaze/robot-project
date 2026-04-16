@@ -3,6 +3,7 @@ from Parser import parse_command
 from Robot_control import RobotController
 from Sequence_manager import SequenceManager
 from robot_voice_app import RobotVoiceApp
+from AI_parser import parse_commands_with_AI
 
 # Robot IP address
 ROBOT_IP = "192.168.1.109"
@@ -19,7 +20,7 @@ def main():
     """
 
     # Initialize robot controller and sequence manager
-    # robot = RobotController(ROBOT_IP)
+    robot = RobotController(ROBOT_IP)
     sequence = SequenceManager()
     app = RobotVoiceApp()
     # Default reference frame (tool frame)
@@ -42,7 +43,10 @@ def main():
                 continue
 
             # Parse natural language command into structured dict
-            cmd = parse_command(sentence)
+            try:
+                cmd = parse_commands_with_AI(sentence)
+            except Exception as e:
+                cmd = parse_command(sentence)  # Fallback to rule-based parser if AI parsing fails
 
             # Invalid command handling
             if cmd is None:

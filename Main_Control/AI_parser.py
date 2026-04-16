@@ -5,7 +5,7 @@ Module for recognize commads with AI
 import json
 from mistralai.client import Mistral
 
-def parse_commands(sentence):
+def parse_commands_with_AI(sentence):
     with open("api_key.json", "r") as f:
         api_key_data = json.load(f)
 
