@@ -94,7 +94,7 @@ class RobotVoiceApp:
             self.root.after(0, self.update_ui, f"Error: {e}")
 
 
-    def record_voice(self, mic_index: int=0, timeout: int=5, phrase_time_limit: int=20) -> sr.AudioData:
+    def record_voice(self, mic_index: int=0, timeout: int=5, phrase_time_limit: int=20):
         """Records voice input from the specified microphone.
         Parameters:
             mic_index: Index of the microphone to use (default is 0).

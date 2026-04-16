@@ -5,7 +5,7 @@ from Sequence_manager import SequenceManager
 from robot_voice_app import RobotVoiceApp
 
 # Robot IP address
-ROBOT_IP = "192.168.1.109"
+ROBOT_IP = "10.220.8.217"
 
 
 def main():
@@ -21,6 +21,7 @@ def main():
     # Initialize robot controller and sequence manager
     robot = RobotController(ROBOT_IP)
     sequence = SequenceManager()
+    app = RobotVoiceApp()
 
     # Default reference frame (tool frame)
     current_frame = "tool"
@@ -29,7 +30,7 @@ def main():
         # Main interactive loop
         while True:
             # Read user input
-            app = RobotVoiceApp()
+            
             sentence = app.main()  # Get the recognized command from the voice app
 
             # Exit condition
