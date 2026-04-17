@@ -33,6 +33,7 @@ def main():
             app.main()  # Get the recognized command from the voice app
 
             if app.text is None:
+                # while waiting for input, continue the loop without doing anything
                 continue
 
             print(f"Received input: {app.text}")
@@ -59,6 +60,7 @@ def main():
             app.update_ui(activateButton=True, result=f"Parsed command: {cmd}")
 
             if not app.command_confirmed:
+                # Wait for user confirmation before executing command
                 continue
 
             # Extract action type
