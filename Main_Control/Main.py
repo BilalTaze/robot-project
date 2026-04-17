@@ -6,7 +6,7 @@ from robot_voice_app import RobotVoiceApp
 from AI_parser import parse_commands_with_AI
 
 # Robot IP address
-ROBOT_IP = "192.168.1.109"
+ROBOT_IP = "192.168.8.184"
 
 
 def main():
@@ -18,7 +18,7 @@ def main():
     - sequence management
     - robot execution
     """
-
+    print("Starting robot control application")
     # Initialize robot controller and sequence manager
     robot = RobotController(ROBOT_IP)
     sequence = SequenceManager()
@@ -30,30 +30,37 @@ def main():
         # Main interactive loop
         while True:
             # Read user input
-            sentence = app.main()  # Get the recognized command from the voice app
+            app.main()  # Get the recognized command from the voice app
 
+            if app.text is None:
+                continue
+
+            print(f"Received input: {app.text}")
             # Exit condition
-            if sentence in ["quit", "exit"]:
+            if "exit" in app.text.lower() or "quit" in app.text.lower() or "close" in app.text.lower():
                 break
 
             # -------- STOP (handled ONLY here) --------
             # Immediate stop command (interrupts current motion)
-            if sentence == "stop":
+            if app.command == "stop":
                 robot.stop_requested = True
                 continue
 
             # Parse natural language command into structured dict
             try:
-                cmd = parse_commands_with_AI(sentence)
+                cmd = parse_commands_with_AI(app.text)
             except Exception as e:
-                cmd = parse_command(sentence)  # Fallback to rule-based parser if AI parsing fails
+                cmd = parse_command(app.text)  # Fallback to rule-based parser if AI parsing fails
 
             # Invalid command handling
             if cmd is None:
-                app.update_ui(activateButton=False, result="Invalid or incomplete command")
+                app.update_ui(activateButton=False, result="Invalid or incomplete command, please try again.")
                 continue
             else:
                 app.update_ui(activateButton=True, result=f"Parsed command: {cmd}")
+
+            if not app.command_confirmed:
+                continue
 
             # Extract action type
             action = cmd.get("action")
@@ -132,14 +139,13 @@ def main():
             if cmd.get("frame") is None:
                 cmd["frame"] = current_frame
 
-            print("Parsed command:", cmd)
-
             # -------- EXECUTION --------
             if sequence.is_active():
                 # Add command to sequence instead of executing
                 sequence.add_command(cmd)
                 print("Command added to sequence")
             else:
+                print(f"Executing command {cmd} immediately")
                 # Prevent concurrent motion
                 if robot.is_moving:
                     print("Robot already moving")
@@ -151,6 +157,11 @@ def main():
                     args=(cmd,),
                     daemon=True
                 ).start()
+                app.reset()
+
+            app.update_ui(activateButton=False, result="Command executed")
+            
+
 
     finally:
         # Ensure robot is properly stopped when exiting program

@@ -25,7 +25,11 @@ class RobotVoiceApp:
         self.recognizer = sr.Recognizer()
         print(f"Loading Whisper model '{model_name}'...")
         self.model = whisper.load_model(model_name)
+    
+    # Initialisation of variables
         self.mic = None
+        self.text = None
+        self.text_recognized = False
         self.command = None
         self.command_confirmed = False
 
@@ -83,13 +87,14 @@ class RobotVoiceApp:
 
         # Update UI to indicate processing
             self.root.after(0, lambda: self.label_status.config(text="Processing..."))
+            self.root.after(1000, lambda: self.btn_listen.config(text="Processing...", state="disabled"))
 
         # Recognize speech using Whisper with English as the default language
-            self.command = self.recognize_voice(audio, api="whisper", language='en')
-            print(self.command)
+            self.text = self.recognize_voice(audio, api="whisper", language='en')
 
-        # Update UI with the result
-            self.root.after(0, self.update_ui, self.command)
+            self.text_recognized = True
+            self.root.quit()
+
         except Exception as e:
         # Display error message if something goes wrong
             self.root.after(0, self.update_ui, f"Error: {e}")
@@ -144,7 +149,6 @@ class RobotVoiceApp:
         """Updates the UI based on the recognition result."""
     # Re-enable the record button
         self.btn_listen.config(state="normal", text="Record")
-        print(f"Recognition result: {result}")
     # Display error or result in the text area
         if result == "":
             self.text_output.insert(tk.END, "Sorry, I didn't understand or hear anything.")
@@ -163,8 +167,8 @@ class RobotVoiceApp:
                 self.confirm_frame.pack()
             # Launch the confirm button animation
                 self.animate_confirm_button()
-            # After 4 seconds, if the user hasn't canceled, the command is confirmed automatically
-                self.confirm_timer = self.root.after(4000, self.command_confirmation)
+            # After 6 seconds, if the user hasn't canceled, the command is confirmed automatically
+                self.confirm_timer = self.root.after(6000, self.command_confirmation)
 
 
     def cancel_command(self):
@@ -173,6 +177,7 @@ class RobotVoiceApp:
         self.btn_cancel.pack_forget()
         self.confirm_frame.pack_forget()
     # Clear the text output and reset status
+        self.reset()
         self.text_output.delete("1.0", tk.END)
         self.label_status.config(text="Command canceled", fg="orange")
     # Cancel the automatic confirmation timer if it's still running
@@ -189,8 +194,8 @@ class RobotVoiceApp:
         if hasattr(self, 'confirm_timer'):
             self.root.after_cancel(self.confirm_timer)
     # Send the confirmed command to the robot
-        self.command_confirmed = True
         self.root.quit()  # Exit the Tkinter main loop to proceed with the confirmed command
+        self.command_confirmed = True
 
 
     def animate_confirm_button(self):
@@ -201,10 +206,10 @@ class RobotVoiceApp:
     # Define the dimensions of the canvas (button)
         width = 150
         height = 40
-    # Total duration of the animation in milliseconds (4 seconds)
-        duration = 4000
+    # Total duration of the animation in milliseconds (6 seconds)
+        duration = 6000
     # Number of steps (frames) in the animation
-        steps = 30
+        steps = 60
 
     # Define the start and end colors for the progress bar
         start_color = "#90E000"
@@ -251,19 +256,27 @@ class RobotVoiceApp:
 
         update_progress()
 
+
+    def reset(self):
+        """Reset variables for the next command."""
+        self.text = None
+        self.text_recognized = False
+        self.command = None
+        self.command_confirmed = False
+
+
     def main(self):
         """Starts the Tkinter main loop and waits for a command to be confirmed."""
         self.root.mainloop()
-        if self.command_confirmed:
-            self.command_confirmed = False  # Reset the confirmation flag for the next command
-            return self.command
+
+
 
 
 if __name__ == "__main__":
     # Launch the application
     app = RobotVoiceApp()
     app.root.mainloop()
-    # while True:
-    #     command = app.main()  # Get the recognized command from the voice app
-    #     if app.command_confirmed:
-    #         print(f"Confirmed command: {command}")
+    while True:
+        command = app.main()  # Get the recognized command from the voice app
+        if app.command_confirmed:
+            print(f"Confirmed command: {command}")

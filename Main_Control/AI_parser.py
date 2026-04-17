@@ -5,7 +5,7 @@ Module for recognize commads with AI
 import json
 from mistralai.client import Mistral
 
-def parse_commands_with_AI(sentence):
+def parse_commands_with_AI(sentence, default_frame="base"):
     with open("api_key.json", "r") as f:
         api_key_data = json.load(f)
 
@@ -17,7 +17,6 @@ def parse_commands_with_AI(sentence):
     question = """
         voici le dictionnaire des commandes que le robot peut comprendre, et les mots associés à chaque paramètre de commande.
         COMMANDS = {
-
             Type of command
             "action": {
                 "move": "move",
@@ -69,7 +68,10 @@ def parse_commands_with_AI(sentence):
         }
 
         En utilisant ce dictionnaire, je veux en sorti le dictionnaire suivant : {'action': 'move', 'direction': [1,0,0], 'distance': 0.1, 'frame': 'base/tool'}
-        Par défault, le frame doit être 'tool' si aucune indication n'est donnée.
+        Si aucune indication n'est donnée, le frame doit être:
+        """
+    question += default_frame
+    question += """
         Répondre uniquement avec le dictionnaire de sortie, sans explication ni texte supplémentaire.
         Voici la phrase à analyser : 
         """
