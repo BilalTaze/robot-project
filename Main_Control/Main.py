@@ -6,7 +6,7 @@ from robot_voice_app import RobotVoiceApp
 from AI_parser import parse_commands_with_AI
 
 # Robot IP address
-ROBOT_IP = "192.168.8.184"
+ROBOT_IP = "10.220.8.217"
 
 
 def main():
@@ -51,7 +51,7 @@ def main():
             try:
                 cmd = parse_command(app.text)  # First try rule-based parsing
                 if cmd is None:
-                    cmd = parse_commands_with_AI(app.text)
+                    cmd = parse_commands_with_AI(app.text, default_frame=current_frame)
             except Exception as e:
             # Invalid command handling
                 app.update_ui(activateButton=False, result="Invalid or incomplete command, please try again.")
@@ -146,7 +146,7 @@ def main():
                 sequence.add_command(cmd)
                 print("Command added to sequence")
             else:
-                print(f"Executing command {cmd} immediately")
+                print(f"Executing command {cmd}")
                 # Prevent concurrent motion
                 if robot.is_moving:
                     print("Robot already moving")
