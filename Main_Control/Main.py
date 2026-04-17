@@ -45,6 +45,7 @@ def main():
             # Immediate stop command (interrupts current motion)
             if "stop" in app.text.lower():
                 robot.stop_requested = True
+                app.reset()
                 continue
 
             # Parse natural language command into structured dict
@@ -55,6 +56,7 @@ def main():
             except Exception as e:
             # Invalid command handling
                 app.update_ui(activateButton=False, result="Invalid or incomplete command, please try again.")
+                app.reset()
                 continue
 
             app.update_ui(activateButton=True, result=f"Parsed command: {cmd}")
@@ -72,6 +74,7 @@ def main():
                 current_frame = cmd.get("frame")
                 print("Parsed command:", cmd)
                 print(f"Frame set to: {current_frame}")
+                app.reset()
                 continue
 
             # -------- SEQUENCE MODE --------
@@ -80,6 +83,7 @@ def main():
                 print("Parsed command:", cmd)
                 sequence.start_sequence_mode()
                 print("Sequence mode activated")
+                app.reset()
                 continue
 
             # Clear stored sequence
@@ -87,6 +91,7 @@ def main():
                 print("Parsed command:", cmd)
                 sequence.clear()
                 print("Sequence cleared")
+                app.reset()
                 continue
 
             # Display stored sequence
@@ -98,6 +103,7 @@ def main():
                     print("Current sequence:")
                     for i, c in enumerate(commands, 1):
                         print(f"{i}. {c}")
+                app.reset()
                 continue
 
             # -------- RUN SEQUENCE --------
@@ -105,6 +111,7 @@ def main():
             if action == "run_sequence":
                 print("Parsed command:", cmd)
                 commands = sequence.get_commands()
+                app.reset()  # Reset UI before running sequence
                 print(f"Running sequence with {len(commands)} commands")
 
                 def worker():
@@ -145,6 +152,7 @@ def main():
                 # Add command to sequence instead of executing
                 sequence.add_command(cmd)
                 print("Command added to sequence")
+                app.reset()
             else:
                 print(f"Executing command {cmd} immediately")
                 # Prevent concurrent motion
