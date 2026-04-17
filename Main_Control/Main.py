@@ -48,16 +48,15 @@ def main():
 
             # Parse natural language command into structured dict
             try:
-                cmd = parse_commands_with_AI(app.text)
+                cmd = parse_command(app.text)  # First try rule-based parsing
+                if cmd is None:
+                    cmd = parse_commands_with_AI(app.text)
             except Exception as e:
-                cmd = parse_command(app.text)  # Fallback to rule-based parser if AI parsing fails
-
             # Invalid command handling
-            if cmd is None:
                 app.update_ui(activateButton=False, result="Invalid or incomplete command, please try again.")
                 continue
-            else:
-                app.update_ui(activateButton=True, result=f"Parsed command: {cmd}")
+
+            app.update_ui(activateButton=True, result=f"Parsed command: {cmd}")
 
             if not app.command_confirmed:
                 continue

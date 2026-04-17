@@ -169,6 +169,9 @@ class RobotVoiceApp:
                 self.animate_confirm_button()
             # After 6 seconds, if the user hasn't canceled, the command is confirmed automatically
                 self.confirm_timer = self.root.after(6000, self.command_confirmation)
+            else:
+                self.btn_cancel.pack_forget()
+                self.confirm_frame.pack_forget()
 
 
     def cancel_command(self):

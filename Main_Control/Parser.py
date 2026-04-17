@@ -13,7 +13,7 @@ def parse_command(sentence):
     """
 
     # Normalize input sentence (lowercase + remove hyphens)
-    s = sentence.lower().replace("-", " ").strip()
+    s = sentence.lower().replace("-", " ").replace(".","").strip()
     words = s.split()
 
     # -------- FRAME MODE --------
