@@ -43,7 +43,7 @@ def main():
 
             # -------- STOP (handled ONLY here) --------
             # Immediate stop command (interrupts current motion)
-            if app.command == "stop":
+            if "stop" in app.text.lower():
                 robot.stop_requested = True
                 continue
 
