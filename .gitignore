@@ -2,3 +2,4 @@ venvProjet/
 __pycache__/
 *.pyc
 .vscode/
+api_key.json
