@@ -52,7 +52,7 @@ def main():
             try:
                 cmd = parse_command(app.text)  # First try rule-based parsing
                 if cmd is None:
-                    cmd = parse_commands_with_AI(app.text)
+                    cmd = parse_commands_with_AI(app.text, default_frame=current_frame)
             except Exception as e:
             # Invalid command handling
                 app.update_ui(activateButton=False, result="Invalid or incomplete command, please try again.")
