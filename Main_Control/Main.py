@@ -35,9 +35,9 @@ def main():
         # while waiting for input, continue the loop without doing anything
             if app.text is None:continue
 
-            print(f"Received input: {app.text}")
+            app.display_information(f"Received input: {app.text}")
 
-        # Exit to end program if user says "exit"
+        # End program if user says "exit"
             if "exit" in app.text.lower():break
 
         # Immediate stop command (interrupts current motion)
@@ -61,15 +61,12 @@ def main():
                 continue
 
         # Display parsed command for confirmation
-            app.display_information(information = f"Parsed command: {cmd.get("normalized_input", cmd)}", activateButton=True)
-
-        # Wait for user confirmation before executing command
-            if not app.command_confirmed:continue
+            info = cmd.get("normalized_input", cmd)
+            app.display_information(information = f"Parsed command: {info}", activateButton=True)
 
         # Command gestion after confirmation
             # Extract action type
             action = cmd.get("action")
-            execution_status = ""
 
             # -------- FRAME MANAGEMENT --------
             # Set global reference frame (base or tool)
@@ -77,7 +74,7 @@ def main():
                 current_frame = cmd.get("frame")
                 print("Parsed command:", cmd)
                 print(f"Frame set to: {current_frame}")
-                execution_status = f"Reference frame set to {current_frame}"
+                robot.execution_status += f"Reference frame set to {current_frame}"
 
             # -------- SEQUENCE MODE --------
             # Activate sequence recording mode
@@ -85,26 +82,26 @@ def main():
                 print("Parsed command:", cmd)
                 sequence.start_sequence_mode()
                 print("Sequence mode activated")
-                execution_status = "Sequence mode activated. Next commands will be added to the sequence until you say 'run sequence'."
+                robot.execution_status += "Sequence mode activated. Next commands will be added to the sequence until you say 'run sequence'."
 
             # Clear stored sequence
             elif action == "clear_sequence":
                 print("Parsed command:", cmd)
                 sequence.clear()
                 print("Sequence cleared")
-                execution_status = "Sequence cleared."
+                robot.execution_status += "Sequence cleared."
 
             # Display stored sequence
             elif action == "show_sequence":
                 commands = sequence.get_commands()
                 if not commands:
                     print("Sequence is empty")
-                    execution_status = "Current sequence is empty."
+                    robot.execution_status += "Current sequence is empty."
                 else:
                     print("Current sequence:")
                     for i, c in enumerate(commands, 1):
                         print(f"{i}. {c}")
-                        execution_status += f"{i}. {c}\n"
+                        robot.execution_status += f"{i}. {c}\n"
 
             # -------- RUN SEQUENCE --------
             # Execute stored sequence asynchronously
@@ -124,7 +121,7 @@ def main():
                         if robot.stop_requested:
                             robot.stop_requested = False
                             print("Sequence interrupted")
-                            execution_status = "Sequence interrupted by user."
+                            robot.execution_status += "Sequence interrupted by user."
                             break
 
                         # Execute command
@@ -133,13 +130,13 @@ def main():
                         # If command failed or was interrupted → stop sequence
                         if not completed:
                             print("Sequence interrupted")
-                            execution_status = "Sequence interrupted during execution."
+                            robot.execution_status += "Sequence interrupted during execution."
                             break
 
                     # Exit sequence mode after execution
                     sequence.stop_sequence_mode()
                     print("Sequence finished")
-                    execution_status = "Sequence execution finished."
+                    robot.execution_status += "Sequence execution finished."
 
                 # Run sequence in separate thread (non-blocking)
                 threading.Thread(target=worker, daemon=True).start()
@@ -154,13 +151,12 @@ def main():
                 # Add command to sequence instead of executing
                 sequence.add_command(cmd)
                 print("Command added to sequence")
-                execution_status = "Command added to sequence."
+                robot.execution_status += "Command added to sequence."
             else:
-                print(f"Executing command {cmd} immediately")
+                app.display_information(information=f"Executing command {cmd} immediately")
                 # Prevent concurrent motion
                 if robot.is_moving:
-                    print("Robot already moving")
-                    execution_status = "Robot already moving."
+                    robot.execution_status += "Robot already moving."
                 else:
                 # Execute command in separate thread (non-blocking)
                     threading.Thread(
@@ -168,12 +164,12 @@ def main():
                         args=(cmd,),
                         daemon=True
                     ).start()
-                    execution_status = "Command executed"
+                    robot.execution_status += "Command executed"
             
         # After execution, reset app state for next command
             app.reset()
         # And display that command was executed (for user feedback)
-            app.display_information(information = execution_status, activateButton=False)
+            app.display_information(information = execution_status)
 
     finally:
         # Ensure robot is properly stopped when exiting program
