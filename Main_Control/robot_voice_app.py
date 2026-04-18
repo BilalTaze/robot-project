@@ -9,6 +9,7 @@ import numpy as np
 import torch
 import tkinter as tk
 import threading
+import time
 
 class RobotVoiceApp:
     """Class for handling voice recording with Whisper support."""
@@ -20,6 +21,7 @@ class RobotVoiceApp:
                 Model options: "tiny", "base", "small", "medium", "large"
                 "base" is a good option for speed/precision balance for an UR3.
             - the Tkinter interface with a button to start recording and a text area for output.
+            - variables to manage the state of the application (recognized text, command confirmation, etc.).
         """
     # Initialize the voice recognition engine
         self.recognizer = sr.Recognizer()
@@ -37,6 +39,10 @@ class RobotVoiceApp:
         self.root = tk.Tk()
         self.root.title("UR3 Voice Control - Whisper")
         self.root.geometry("500x500")
+
+    # Instructions for user
+        self.label_instruction = tk.Label(self.root, text="Press 'Record' and wait that the button displays Listening... to speak the command for the UR3 robot. The recognized command will appear below.\nIf you want to stop the robot, say 'stop'.\nIf you want to quit the interface, say 'exit'", font=("Arial", 12))
+        self.label_instruction.pack(pady=20)
 
     # Status label to show current state
         self.label_status = tk.Label(self.root, text="Ready for UR3", font=("Arial", 12))
@@ -79,15 +85,13 @@ class RobotVoiceApp:
         """Handles voice recording and recognition in a separate thread."""
         try:
         # Update UI to indicate recording has started
-            self.root.after(1000, lambda: self.btn_listen.config(text="Listening...", state="disabled"))
-            self.root.after(1000, lambda: self.label_status.config(text="Recording..."))
+            self.root.after(1500, lambda: self.btn_listen.config(text="Listening...", state="disabled"))
 
         # Record audio from microphone
             audio = self.record_voice()
 
         # Update UI to indicate processing
-            self.root.after(0, lambda: self.label_status.config(text="Processing..."))
-            self.root.after(1000, lambda: self.btn_listen.config(text="Processing...", state="disabled"))
+            self.root.after(0, lambda: self.btn_listen.config(text="Processing...", state="disabled"))
 
         # Recognize speech using Whisper with English as the default language
             self.text = self.recognize_voice(audio, api="whisper", language='en')
@@ -100,12 +104,12 @@ class RobotVoiceApp:
             self.root.after(0, self.update_ui, f"Error: {e}")
 
 
-    def record_voice(self, mic_index: int=0, timeout: int=5, phrase_time_limit: int=20) -> sr.AudioData:
+    def record_voice(self, mic_index: int=0, timeout: int=10, phrase_time_limit: int=30) -> sr.AudioData:
         """Records voice input from the specified microphone.
         Parameters:
             mic_index: Index of the microphone to use (default is 0).
-            timeout: Maximum time to wait for audio input (default is 5 seconds).
-            phrase_time_limit: Maximum time for a phrase to be recorded (default is 20 seconds).
+            timeout: Maximum time to wait for audio input (default is 10 seconds).
+            phrase_time_limit: Maximum time for a phrase to be recorded (default is 30 seconds).
         Returns:
             sr.AudioData: The recorded audio data.
         """
@@ -114,6 +118,8 @@ class RobotVoiceApp:
         with self.mic as source:
         # Adjust for ambient noise in a separate thread
             threading.Thread(target=self.recognizer.adjust_for_ambient_noise, args=(source, 1)).start()
+        # Wait 1 second for the noise adjustment to take effect
+            time.sleep(1)
         # Listen for audio input with timeout and phrase limit
             return self.recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
 
@@ -145,33 +151,34 @@ class RobotVoiceApp:
             return f"Error during recognition: {e}"
 
 
-    def update_ui(self, result, activateButton: bool=True):
-        """Updates the UI based on the recognition result."""
+    def display_information(self, information: str = "", validationButton: bool = True):
+        """
+        Display information on the text area.
+        Parameters:
+            information: The text to display in the text area.
+            validationButton: Whether to show the confirm/cancel buttons (default is True).
+        """
     # Re-enable the record button
         self.btn_listen.config(state="normal", text="Record")
-    # Display error or result in the text area
-        if result == "":
-            self.text_output.insert(tk.END, "Sorry, I didn't understand or hear anything.")
-            self.label_status.config(text="Reception failed", fg="orange")
-        else:
-        # Reset text output
-            self.text_output.delete("1.0", tk.END)
-        # Command is displayed
-            self.text_output.insert(tk.END, result)
-        # Status is updated to indicate a command was received
-            self.label_status.config(text="Command received!", fg="green")
 
-            if activateButton:
-            # Show the confirm and cancel buttons
-                self.btn_cancel.pack()
-                self.confirm_frame.pack()
-            # Launch the confirm button animation
-                self.animate_confirm_button()
-            # After 6 seconds, if the user hasn't canceled, the command is confirmed automatically
-                self.confirm_timer = self.root.after(6000, self.command_confirmation)
-            else:
-                self.btn_cancel.pack_forget()
-                self.confirm_frame.pack_forget()
+    # Reset text output
+        self.text_output.delete("1.0", tk.END)
+    # Information is displayed
+        self.text_output.insert(tk.END, information)
+    # Status is updated to indicate a command was received
+        self.label_status.config(text="Command received!", fg="green")
+
+        if validationButton:
+        # Show the confirm and cancel buttons
+            self.btn_cancel.pack()
+            self.confirm_frame.pack()
+        # Launch the confirm button animation
+            self.animate_confirm_button(duration = 6000)
+        # After 6 seconds, if the user hasn't canceled, the command is confirmed automatically
+            self.confirm_timer = self.root.after(6000, self.command_confirmation)
+        else:
+            self.btn_cancel.pack_forget()
+            self.confirm_frame.pack_forget()
 
 
     def cancel_command(self):
@@ -179,10 +186,12 @@ class RobotVoiceApp:
     # Hide the confirm and cancel buttons
         self.btn_cancel.pack_forget()
         self.confirm_frame.pack_forget()
-    # Clear the text output and reset status
+    # reset status
         self.reset()
-        self.text_output.delete("1.0", tk.END)
-        self.label_status.config(text="Command canceled", fg="orange")
+    # Display cancellation message
+        self.display_information(information = "Command canceled", activateButton=False)
+    # Clear message after 5 seconds
+        self.root.after(5000, self.display_information, information="", activateButton=False)
     # Cancel the automatic confirmation timer if it's still running
         if hasattr(self, 'confirm_timer'):
             self.root.after_cancel(self.confirm_timer)
@@ -196,23 +205,21 @@ class RobotVoiceApp:
     # Cancel the automatic confirmation timer if it's still running
         if hasattr(self, 'confirm_timer'):
             self.root.after_cancel(self.confirm_timer)
-    # Send the confirmed command to the robot
-        self.root.quit()  # Exit the Tkinter main loop to proceed with the confirmed command
+    # Set the command as confirmed to allow execution in the main loop
         self.command_confirmed = True
 
 
-    def animate_confirm_button(self):
+    def animate_confirm_button(self, duration: int = 6000, steps: int = 60):
         """
         Animates a progress bar under the "Confirm" text.
         The bar moves from left to right with a color gradient.
+        Parameters:
+            duration: Total duration of the animation in milliseconds (default is 6000ms).
+            steps: Number of steps for the animation (default is 60).
         """
     # Define the dimensions of the canvas (button)
         width = 150
         height = 40
-    # Total duration of the animation in milliseconds (6 seconds)
-        duration = 6000
-    # Number of steps (frames) in the animation
-        steps = 60
 
     # Define the start and end colors for the progress bar
         start_color = "#90E000"
@@ -261,16 +268,14 @@ class RobotVoiceApp:
 
 
     def reset(self):
-        """Reset variables for the next command."""
+        """Reset variables for the next command and hide validation buttons."""
         self.text = None
         self.text_recognized = False
         self.command = None
         self.command_confirmed = False
+        self.btn_cancel.pack_forget()
+        self.confirm_frame.pack_forget()
 
-
-    def main(self):
-        """Starts the Tkinter main loop and waits for a command to be confirmed."""
-        self.root.mainloop()
 
 
 
