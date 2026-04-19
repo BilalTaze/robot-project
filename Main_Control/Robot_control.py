@@ -36,6 +36,9 @@ class RobotController:
         # Indicates if robot is currently moving
         self.is_moving = False
 
+    # Initialization of execution status that will be displayed in the app after command execution
+        self.execution_status = ""
+
     # ------------------------------------------------------------------
     # Basic math helpers
     # ------------------------------------------------------------------
@@ -166,7 +169,7 @@ class RobotController:
             pass
 
         self.stop_requested = False
-        print("Robot stopped")
+        self.execution_status += "Robot stopped"
 
     # ------------------------------------------------------------------
     # Safety helpers
@@ -175,12 +178,12 @@ class RobotController:
     def _is_target_safe(self, target_pose, motion_name="movement"):
         # Check workspace limits
         if not self.safety.is_pose_safe(target_pose):
-            print(f"Target outside workspace: {motion_name} cancelled")
+            self.execution_status += f"Target outside workspace: {motion_name} cancelled"
             return False
 
         # Check reach limits
         if not self.safety.is_reach_safe(target_pose):
-            print(f"Reach limit exceeded: {motion_name} cancelled")
+            self.execution_status += f"Reach limit exceeded: {motion_name} cancelled"
             return False
 
         return True
@@ -282,7 +285,7 @@ class RobotController:
             time.sleep(dt)
 
         self.rtde_c.speedStop()
-        print("Target not reached within iteration limit")
+        self.execution_status += "Target not reached within iteration limit"
         return False
 
     def _speedL_rotate_to_target(
@@ -338,7 +341,7 @@ class RobotController:
             time.sleep(dt)
 
         self.rtde_c.speedStop()
-        print("Rotation target not reached within iteration limit")
+        self.execution_status += "Rotation target not reached within iteration limit"
         return False
 
     # ------------------------------------------------------------------
@@ -358,7 +361,7 @@ class RobotController:
 
                 # Check joint safety before motion
                 if not self.safety.is_joint_configuration_safe(current_joints):
-                    print("Unsafe joint configuration: command cancelled")
+                    self.execution_status += "Unsafe joint configuration: command cancelled"
                     return False
 
                 # -------- ROTATION --------
@@ -369,7 +372,7 @@ class RobotController:
                         return False
 
                     if not self.safety.is_rotation_step_safe(rotation):
-                        print("Rotation too large: command cancelled")
+                        self.execution_status += "Rotation too large: command cancelled"
                         return False
 
                     pose = self.rtde_r.getActualTCPPose()
@@ -395,7 +398,7 @@ class RobotController:
                     return False
 
                 if not self.safety.is_translation_step_safe(distance):
-                    print("Translation too large: command cancelled")
+                    self.execution_status += "Translation too large: command cancelled"
                     return False
 
                 pose = self.rtde_r.getActualTCPPose()

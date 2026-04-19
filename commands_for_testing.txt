@@ -1,0 +1,32 @@
+1. Commandes de déplacement :
+
+	- Commande : move [axis] [plus/minus] [distance]
+	- Exemples : 
+		- move x plus small
+		- move x minus medium
+		- move y plus far
+		- move z minus small
+		- move x plus ten centimeters
+		- move y minus twenty centimeters
+		- move z plus five centimeters
+
+2. Commandes de rotation :
+	- Commande : rotate [axis] [plus/minus] [angle]
+	- Exemple :
+		- rotate x plus small
+		- rotate y minus medium
+		- rotate z plus far
+		- rotate x plus ten degrees
+		- rotate y minus twenty degrees
+		- rotate z plus thirty degrees
+
+3. Choix du repère (frame) :
+	Commandes :
+		- frame base
+		- frame tool
+
+4. Mode séquence :
+	- Commande : sequence mode
+	- Voir la séquence : show sequence
+	- Executer : run sequence
+	- Effacer : clear sequence

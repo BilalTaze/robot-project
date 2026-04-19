@@ -11,8 +11,6 @@ Goals:
     * sequence   -> {"action": "sequence_mode" | "show_sequence" | ...}
 """
 
-from __future__ import annotations   
-
 import json
 import math
 from typing import Any
