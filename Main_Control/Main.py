@@ -35,7 +35,7 @@ def main():
         # while waiting for input, continue the loop without doing anything
             if app.text is None:continue
 
-            app.display_information(f"Received input: {app.text}")
+            app.display_information(information=f"Received input: {app.text}", delete_previous=True)
 
         # End program if user says "exit"
             if "exit" in app.text.lower():break
@@ -56,13 +56,15 @@ def main():
 
             except Exception as e:
             # Invalid command handling
-                app.display_information(information = "Invalid or incomplete command, please try again.", activateButton=False)
+                app.display_information(information = "Invalid or incomplete command, please try again.")
                 app.reset()
                 continue
+            else:
+                app.enable_record_button()
 
         # Display parsed command for confirmation
             info = cmd.get("normalized_input", cmd)
-            app.display_information(information = f"Parsed command: {info}", activateButton=True)
+            app.display_information(information = f"Parsed command: {info}")
 
         # Command gestion after confirmation
             # Extract action type
@@ -115,7 +117,6 @@ def main():
                     Thread worker executing the sequence step by step.
                     Handles stop and interruption.
                     """
-                    global execution_status
                     for c in commands:
                         # Stop requested before starting next command
                         if robot.stop_requested:
@@ -153,7 +154,7 @@ def main():
                 print("Command added to sequence")
                 robot.execution_status += "Command added to sequence."
             else:
-                app.display_information(information=f"Executing command {cmd} immediately")
+                app.display_information(information=f"Executing command immediately")
                 # Prevent concurrent motion
                 if robot.is_moving:
                     robot.execution_status += "Robot already moving."
@@ -169,7 +170,8 @@ def main():
         # After execution, reset app state for next command
             app.reset()
         # And display that command was executed (for user feedback)
-            app.display_information(information = execution_status)
+            app.display_information(information = robot.execution_status)
+            robot.execution_status = ""
 
     finally:
         # Ensure robot is properly stopped when exiting program

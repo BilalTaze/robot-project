@@ -49,7 +49,7 @@ class RobotVoiceApp:
         self.btn_listen.pack(pady=10)
 
     # Text area to display recognized speech
-        self.text_output = tk.Text(self.root, height=10, width=50, font=("Arial", 10), state=tk.DISABLED, bg="darkgrey")
+        self.text_output = tk.Text(self.root, height=10, width=50, font=("Arial", 10), bg="darkgrey")
         self.text_output.pack(pady=20)
 
         
@@ -82,7 +82,8 @@ class RobotVoiceApp:
 
         except Exception as e:
         # Display error message if something goes wrong
-            self.root.after(0, self.update_ui, f"Error: {e}")
+            self.display_information(f"Error: {e}")
+            self.enable_record_button()
 
 
     def record_voice(self, mic_index: int=0, timeout: int=10, phrase_time_limit: int=30) -> sr.AudioData:
@@ -161,7 +162,9 @@ class RobotVoiceApp:
 if __name__ == "__main__":
 # Launch the application
     app = RobotVoiceApp()
-    app.root.mainloop()
-    if app.text_recognized:
-        print(f"Recognized command: {app.text}")
+    while True:
+        app.root.mainloop()
+        if app.text is not None:
+            app.display_information(f"Recognized command: {app.text}")
+            app.enable_record_button()
 
