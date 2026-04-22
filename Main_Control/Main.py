@@ -7,7 +7,7 @@ from robot_voice_app import RobotVoiceApp
 from AI_parser import parse_commands_with_AI
 
 # Robot IP address
-ROBOT_IP = "192.168.8.200"
+ROBOT_IP = "192.168.8.202"
 
 
 def main():
@@ -27,19 +27,23 @@ def main():
     # Default reference frame (tool frame)
     current_frame = "tool"
 
+    i=0
     try:
         # Main interactive loop
         while True:
+            i+=1
+            print(f"--- Iteration {i} ---")
         # Launch the Tkinter main loop to wait for user input and confirmation
             app.root.mainloop()
 
             if app.stop_robot:
                 print("in stop condition")
                 robot._stop_motion()
+                robot.stop_requested = True
                 app.stop_robot = False
                 app.reset()
                 app.display_information(information="Stop command sent to robot.")
-                time.sleep(0.1)
+                continue
 
         # while waiting for input, continue the loop without doing anything
             if app.text is None:continue
@@ -96,11 +100,12 @@ def main():
                 else:
                     robot.execution_status += "Current sequence:\n"
                     for i, c in enumerate(commands, 1):
-                        robot.execution_status += f"{i}. {c}\n"
+                        robot.execution_status += f"{i}. {c.get('normalized_input', c)}\n"
 
             # -------- RUN SEQUENCE --------
             # Execute stored sequence asynchronously
             elif action == "run_sequence":
+                print("Running sequence")
                 commands = sequence.get_commands()
                 robot.execution_status += f"Running sequence with {len(commands)} commands"
 
@@ -112,10 +117,14 @@ def main():
                     for c in commands:
                         # Stop requested before starting next command
                         robot.execution_status += f"Executing command: {c}"
-
+                        print(f'stop requested: {robot.stop_requested}')
 
                         # Execute command
-                        completed = robot.execute_command(c)
+                        if not robot.stop_requested: completed = robot.execute_command(c)
+                        else:
+                            app.reset()
+                            robot.stop_requested = False
+                            robot.execution_status += "Sequence execution stopped by user."
 
                         # If command failed or was interrupted → stop sequence
                         if not completed:
@@ -143,6 +152,7 @@ def main():
                 app.display_information(information=f"Executing command immediately")
                 # Prevent concurrent motion
                 if robot.is_moving: robot.execution_status += "Robot already moving."
+                elif robot.stop_requested: robot.execution_status += "Stop requested, cannot execute new command."
                 else:
                 # Execute command in separate thread (non-blocking)
                     threading.Thread(

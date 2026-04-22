@@ -44,7 +44,7 @@ class RobotVoiceApp:
         self.root.configure(bg=background_color)
 
     # Instructions for user
-        self.label_instruction = tk.Label(self.root, text='Press "Record" and wait that the button displays "Listening"... to speak the command for the UR3 robot. The recognized command will appear below.\n\nIf you want to stop and quit the interface, say "exit"\n\nIf you wwant to stop the movment during the execution, use the stop button', font=("Arial", 12), wraplength=400, justify="left", bg=background_color)
+        self.label_instruction = tk.Label(self.root, text='Press "Record" and wait that the button displays "Listening"... to speak the command for the UR3 robot. The recognized command will appear below.\n\nIf you want to stop and quit the interface, say "exit"\n\nIf you want to stop the movment during the execution, use the stop button', font=("Arial", 12), wraplength=400, justify="left", bg=background_color)
         self.label_instruction.pack(pady=20)
 
     # Button to trigger voice recording
