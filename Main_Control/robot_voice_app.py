@@ -11,6 +11,7 @@ import tkinter as tk
 import threading
 import time
 
+
 class RobotVoiceApp:
     """Class for handling voice recording with Whisper support."""
 
@@ -32,24 +33,30 @@ class RobotVoiceApp:
         self.mic = None
         self.text = None
         self.command = None
+        self.stop_robot = False
 
     # Initialize the Tkinter GUI
         background_color = "grey"
+        text_area_color = "darkgrey"
         self.root = tk.Tk()
         self.root.title("UR3 Voice Control - Whisper")
-        self.root.geometry("450x500")
+        self.root.geometry("450x600")
         self.root.configure(bg=background_color)
 
     # Instructions for user
-        self.label_instruction = tk.Label(self.root, text="Press \"Record\" and wait that the button displays \"Listening\"... to speak the command for the UR3 robot. The recognized command will appear below.\n\nIf you want to stop the robot, say \"stop\".\nIf you want to quit the interface, say \"exit\"", font=("Arial", 12), wraplength=400, justify="left", bg=background_color)
+        self.label_instruction = tk.Label(self.root, text='Press "Record" and wait that the button displays "Listening"... to speak the command for the UR3 robot. The recognized command will appear below.\n\nIf you want to stop and quit the interface, say "exit"\n\nIf you wwant to stop the movment during the execution, use the stop button', font=("Arial", 12), wraplength=400, justify="left", bg=background_color)
         self.label_instruction.pack(pady=20)
 
     # Button to trigger voice recording
-        self.btn_listen = tk.Button(self.root, text="Record", command=self.buton_activation, bg="red", fg="white", font=("Arial", 14, "bold"), width=15, height=2)
+        self.btn_listen = tk.Button(self.root, text="Record", command=self.buton_activation, bg="green", fg="white", font=("Arial", 14, "bold"), width=15, height=2)
         self.btn_listen.pack(pady=10)
 
+    # Stop button
+        self.btn_stop = tk.Button(self.root, text="Stop Robot", command=self.stop_button_activation, bg="red", fg="white", font=("Arial", 12, "bold"), width=15, height=2)
+        self.btn_stop.pack(pady=10) 
+
     # Text area to display recognized speech
-        self.text_output = tk.Text(self.root, height=10, width=50, font=("Arial", 10), bg="darkgrey")
+        self.text_output = tk.Text(self.root, height=20, width=60, font=("Arial", 10), bg=text_area_color)
         self.text_output.pack(pady=20)
 
         
@@ -61,6 +68,12 @@ class RobotVoiceApp:
     # Launch voice processing in a background thread
         thread = threading.Thread(target=self.process_voice)
         thread.start()
+
+
+    def stop_button_activation(self):
+        """Handles the stop button activation."""
+        self.stop_robot = True
+        self.display_information("Stop command received")
 
 
     def process_voice(self):
