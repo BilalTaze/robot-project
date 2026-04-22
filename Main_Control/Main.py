@@ -1,4 +1,5 @@
 import threading
+import time
 from Parser import parse_command
 from Robot_control import RobotController
 from Sequence_manager import SequenceManager
@@ -32,27 +33,28 @@ def main():
         # Launch the Tkinter main loop to wait for user input and confirmation
             app.root.mainloop()
 
+            if app.stop_robot:
+                print("in stop condition")
+                robot._stop_motion()
+                app.stop_robot = False
+                app.reset()
+                app.display_information(information="Stop command sent to robot.")
+                time.sleep(0.1)
+
         # while waiting for input, continue the loop without doing anything
             if app.text is None:continue
 
             app.display_information(information=f"Received input: {app.text}", delete_previous=True)
 
         # End program if user says "exit"
-            if "exit" in app.text.lower():break
-
-        # Immediate stop command (interrupts current motion)
-            if "stop" in app.text.lower():
-                robot.stop_requested = True
-                app.reset()
-                continue
+            if "exit" in app.text.lower(): break
 
         # Parse natural language command into structured dict
             try:
-                # First try standard parsing
+            # First try standard parsing
                 cmd = parse_command(app.text)
-                if cmd is None:
-                    # If standard parsing fails, try AI parsing
-                    cmd = parse_commands_with_AI(app.text, default_frame=current_frame)
+            # If standard parsing fails, try AI parsing
+                if cmd is None: cmd = parse_commands_with_AI(app.text, default_frame=current_frame)
 
             except Exception as e:
             # Invalid command handling
@@ -74,43 +76,33 @@ def main():
             # Set global reference frame (base or tool)
             if action == "set_frame":
                 current_frame = cmd.get("frame")
-                print("Parsed command:", cmd)
-                print(f"Frame set to: {current_frame}")
                 robot.execution_status += f"Reference frame set to {current_frame}"
 
             # -------- SEQUENCE MODE --------
             # Activate sequence recording mode
             elif action == "sequence_mode":
-                print("Parsed command:", cmd)
                 sequence.start_sequence_mode()
-                print("Sequence mode activated")
                 robot.execution_status += "Sequence mode activated. Next commands will be added to the sequence until you say 'run sequence'."
 
             # Clear stored sequence
             elif action == "clear_sequence":
-                print("Parsed command:", cmd)
                 sequence.clear()
-                print("Sequence cleared")
                 robot.execution_status += "Sequence cleared."
 
             # Display stored sequence
             elif action == "show_sequence":
                 commands = sequence.get_commands()
-                if not commands:
-                    print("Sequence is empty")
-                    robot.execution_status += "Current sequence is empty."
+                if not commands: robot.execution_status += "Current sequence is empty."
                 else:
-                    print("Current sequence:")
+                    robot.execution_status += "Current sequence:\n"
                     for i, c in enumerate(commands, 1):
-                        print(f"{i}. {c}")
                         robot.execution_status += f"{i}. {c}\n"
 
             # -------- RUN SEQUENCE --------
             # Execute stored sequence asynchronously
             elif action == "run_sequence":
-                print("Parsed command:", cmd)
                 commands = sequence.get_commands()
-                print(f"Running sequence with {len(commands)} commands")
+                robot.execution_status += f"Running sequence with {len(commands)} commands"
 
                 def worker():
                     """
@@ -119,24 +111,20 @@ def main():
                     """
                     for c in commands:
                         # Stop requested before starting next command
-                        if robot.stop_requested:
-                            robot.stop_requested = False
-                            print("Sequence interrupted")
-                            robot.execution_status += "Sequence interrupted by user."
-                            break
+                        robot.execution_status += f"Executing command: {c}"
+
 
                         # Execute command
                         completed = robot.execute_command(c)
 
                         # If command failed or was interrupted → stop sequence
                         if not completed:
-                            print("Sequence interrupted")
                             robot.execution_status += "Sequence interrupted during execution."
                             break
 
                     # Exit sequence mode after execution
                     sequence.stop_sequence_mode()
-                    print("Sequence finished")
+                    # sequence.clear()
                     robot.execution_status += "Sequence execution finished."
 
                 # Run sequence in separate thread (non-blocking)
@@ -144,20 +132,17 @@ def main():
 
             # -------- APPLY FRAME --------
             # Apply global frame if not specified in command
-            elif cmd.get("frame") is None:
-                cmd["frame"] = current_frame
+            elif cmd.get("frame") is None: cmd["frame"] = current_frame
 
             # -------- EXECUTION --------
             elif sequence.is_active():
                 # Add command to sequence instead of executing
                 sequence.add_command(cmd)
-                print("Command added to sequence")
                 robot.execution_status += "Command added to sequence."
             else:
                 app.display_information(information=f"Executing command immediately")
                 # Prevent concurrent motion
-                if robot.is_moving:
-                    robot.execution_status += "Robot already moving."
+                if robot.is_moving: robot.execution_status += "Robot already moving."
                 else:
                 # Execute command in separate thread (non-blocking)
                     threading.Thread(
