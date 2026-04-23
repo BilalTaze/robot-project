@@ -31,25 +31,16 @@ def main():
     # Security stop loop
         def stop_loop():
             while True:
-                if robot.stop_requested:
+                if robot.stop_requested or app.stop_robot:
                     robot._stop_motion()
                     app.reset()
                     robot.stop_requested = False
-        threading.Thread(target=stop_loop)
+        threading.Thread(target=stop_loop, daemon=True).start()
 
     # Main interactive loop
         while True:
         # Launch the Tkinter main loop to wait for user input and confirmation
             app.root.mainloop()
-
-            # if app.stop_robot:
-            #     print("in stop condition")
-            #     robot._stop_motion()
-            #     robot.stop_requested = True
-            #     app.stop_robot = False
-            #     app.reset()
-            #     app.display_information(information="Stop command sent to robot.")
-            #     continue
 
         # while waiting for input, continue the loop without doing anything
             if app.text is None:continue
@@ -111,7 +102,6 @@ def main():
             # -------- RUN SEQUENCE --------
             # Execute stored sequence asynchronously
             elif action == "run_sequence":
-                print("Running sequence")
                 commands = sequence.get_commands()
                 robot.execution_status += f"Running sequence with {len(commands)} commands"
 
@@ -123,7 +113,6 @@ def main():
                     for c in commands:
                         # Stop requested before starting next command
                         robot.execution_status += f"Executing command: {c}"
-                        print(f'stop requested: {robot.stop_requested}')
 
                         # Execute command
                         if not robot.stop_requested: completed = robot.execute_command(c)
@@ -139,7 +128,7 @@ def main():
 
                     # Exit sequence mode after execution
                     sequence.stop_sequence_mode()
-                    # sequence.clear()
+                    sequence.clear()
                     robot.execution_status += "Sequence execution finished."
 
                 # Run sequence in separate thread (non-blocking)
