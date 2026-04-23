@@ -7,7 +7,7 @@ from robot_voice_app import RobotVoiceApp
 from AI_parser import parse_commands_with_AI
 
 # Robot IP address
-ROBOT_IP = "192.168.8.202"
+ROBOT_IP = "192.168.8.200"
 
 
 def main():
@@ -27,23 +27,29 @@ def main():
     # Default reference frame (tool frame)
     current_frame = "tool"
 
-    i=0
     try:
-        # Main interactive loop
+    # Security stop loop
+        def stop_loop():
+            while True:
+                if robot.stop_requested:
+                    robot._stop_motion()
+                    app.reset()
+                    robot.stop_requested = False
+        threading.Thread(target=stop_loop)
+
+    # Main interactive loop
         while True:
-            i+=1
-            print(f"--- Iteration {i} ---")
         # Launch the Tkinter main loop to wait for user input and confirmation
             app.root.mainloop()
 
-            if app.stop_robot:
-                print("in stop condition")
-                robot._stop_motion()
-                robot.stop_requested = True
-                app.stop_robot = False
-                app.reset()
-                app.display_information(information="Stop command sent to robot.")
-                continue
+            # if app.stop_robot:
+            #     print("in stop condition")
+            #     robot._stop_motion()
+            #     robot.stop_requested = True
+            #     app.stop_robot = False
+            #     app.reset()
+            #     app.display_information(information="Stop command sent to robot.")
+            #     continue
 
         # while waiting for input, continue the loop without doing anything
             if app.text is None:continue

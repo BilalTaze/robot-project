@@ -169,6 +169,7 @@ class RobotVoiceApp:
         self.enable_record_button()
         self.text = None
         self.command = None
+        self.stop_robot = False
 
 
 
