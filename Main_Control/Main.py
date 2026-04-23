@@ -6,7 +6,7 @@ from robot_voice_app import RobotVoiceApp
 from AI_parser import parse_commands_with_AI
 
 # Robot IP address
-ROBOT_IP = "10.220.8.217"
+ROBOT_IP = "0.0.0.0"  # Replace with actual robot IP address
 
 
 def main():
