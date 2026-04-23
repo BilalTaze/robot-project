@@ -1,8 +1,10 @@
 import threading
-from Parser import parse_command
+
 from Robot_control import RobotController
 from Sequence_manager import SequenceManager
 from robot_voice_app import RobotVoiceApp
+
+from Parser import parse_command
 from AI_parser import parse_commands_with_AI
 
 # Robot IP address
