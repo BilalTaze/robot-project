@@ -201,23 +201,23 @@ def validate_command(command: dict[str, Any], default_frame: str = "base") -> di
 
 def _build_prompt(sentence: str, default_frame: str) -> str:
     return f"""
-Tu dois corriger et interpréter une phrase de commande robot.
-Réponds uniquement avec un JSON valide. Aucun texte supplémentaire.
+You must correct and interpret a robot command sentence.
+Respond only with valid JSON. No additional text.
 
-Comportement obligatoire :
-- Tu peux corriger les fautes, les mots mal prononcés et les petites erreurs.
-- Tu peux reformuler une commande mal dite vers une commande correcte.
-- Tu ne dois jamais inventer une information absente.
-- Si une information obligatoire manque, la commande est invalide.
+Mandatory behavior:
+- You can correct spelling mistakes, mispronounced words, and small errors.
+- You can rephrase a poorly worded command into a correct one.
+- You must never invent missing information.
+- If mandatory information is missing, the command is invalid.
 
-Exemple de correction autorisée :
+Example of allowed correction:
 - "More x plus ten centim" -> "move x plus ten centimeters"
 
-Exemples interdits :
-- "move x" ne doit PAS devenir "move x plus small"
-- "rotate z" ne doit PAS devenir "rotate z plus ten degrees"
+Forbidden examples:
+- "move x" must NOT become "move x plus small"
+- "rotate z" must NOT become "rotate z plus ten degrees"
 
-Commandes supportées :
+Supported commands:
 1. move [axis] [plus/minus] [distance]
 2. rotate [axis] [plus/minus] [angle]
 3. frame base | frame tool | frame tcp
@@ -226,18 +226,18 @@ Commandes supportées :
 6. run sequence
 7. clear sequence
 
-Règles :
-- axis doit être x, y ou z
-- sign doit être plus ou minus
-- si le frame n'est pas donné pour move ou rotate, utiliser "{default_frame}"
-- tcp équivaut à tool
-- small, medium, far sont des magnitudes valides
-- une distance explicite en centimeters ou meters est valide
-- un angle explicite en degrees ou radians est valide
+Rules:
+- axis must be x, y or z
+- sign must be plus or minus
+- if frame is not given for move or rotate, use "{default_frame}"
+- tcp is equivalent to tool
+- small, medium, far are valid magnitudes
+- an explicit distance in centimeters or meters is valid
+- an explicit angle in degrees or radians is valid
 
-Le JSON de sortie doit avoir l'un des formats suivants.
+The output JSON must have one of the following formats.
 
-1. move :
+1. move:
 {{
   "action": "move",
   "normalized_input": "move x plus ten centimeters",
@@ -247,7 +247,7 @@ Le JSON de sortie doit avoir l'un des formats suivants.
   "frame": "base"
 }}
 
-2. rotate :
+2. rotate:
 {{
   "action": "rotate",
   "normalized_input": "rotate z minus twenty degrees",
@@ -258,32 +258,32 @@ Le JSON de sortie doit avoir l'un des formats suivants.
   "frame": "tool"
 }}
 
-3. set frame :
+3. set frame:
 {{
   "action": "set_frame",
   "normalized_input": "frame tool",
   "frame": "tool"
 }}
 
-4. sequence :
+4. sequence:
 {{"action": "sequence_mode", "normalized_input": "sequence mode"}}
 {{"action": "show_sequence", "normalized_input": "show sequence"}}
 {{"action": "run_sequence", "normalized_input": "run sequence"}}
 {{"action": "clear_sequence", "normalized_input": "clear sequence"}}
 
-5. invalid :
+5. invalid:
 {{
   "action": "invalid",
   "normalized_input": "move x",
   "reason": "incomplete_move_command"
 }}
 
-Important :
-- Si la commande est incomplète, retourne obligatoirement action="invalid".
-- N'invente jamais axis, sign, distance, angle ou frame s'ils sont absents.
-- Réponds avec un seul objet JSON.
+Important:
+- If the command is incomplete, you must return action="invalid".
+- Never invent axis, sign, distance, angle or frame if they are absent.
+- Respond with a single JSON object.
 
-Phrase à analyser :
+Sentence to analyze:
 {sentence}
 """.strip()
 
