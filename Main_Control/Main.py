@@ -31,40 +31,44 @@ def main():
     try:
         # Main interactive loop
         while True:
-            # Read user input
-            app.main()  # Get the recognized command from the voice app
+        # Launch the Tkinter main loop to wait for user input and confirmation
+            app.root.mainloop()
 
-            if app.text is None:
-                # while waiting for input, continue the loop without doing anything
-                continue
+        # while waiting for input, continue the loop without doing anything
+            if app.text is None:continue
 
-            print(f"Received input: {app.text}")
-            # Exit condition
-            if "exit" in app.text.lower() or "quit" in app.text.lower() or "close" in app.text.lower():
-                break
+            app.display_information(information=f"Received input: {app.text}", delete_previous=True)
 
-            # -------- STOP (handled ONLY here) --------
-            # Immediate stop command (interrupts current motion)
-            if app.command == "stop":
+        # End program if user says "exit"
+            if "exit" in app.text.lower():break
+
+        # Immediate stop command (interrupts current motion)
+            if "stop" in app.text.lower():
                 robot.stop_requested = True
+                app.reset()
                 continue
 
-            # Parse natural language command into structured dict
+        # Parse natural language command into structured dict
             try:
-                cmd = parse_command(app.text)  # First try rule-based parsing
+                # First try standard parsing
+                cmd = parse_command(app.text)
                 if cmd is None:
+                    # If standard parsing fails, try AI parsing
                     cmd = parse_commands_with_AI(app.text, default_frame=current_frame)
+
             except Exception as e:
             # Invalid command handling
-                app.update_ui(activateButton=False, result="Invalid or incomplete command, please try again.")
+                app.display_information(information = "Invalid or incomplete command, please try again.")
+                app.reset()
                 continue
+            else:
+                app.enable_record_button()
 
-            app.update_ui(activateButton=True, result=f"Parsed command: {cmd}")
+        # Display parsed command for confirmation
+            info = cmd.get("normalized_input", cmd)
+            app.display_information(information = f"Parsed command: {info}")
 
-            if not app.command_confirmed:
-                # Wait for user confirmation before executing command
-                continue
-
+        # Command gestion after confirmation
             # Extract action type
             action = cmd.get("action")
 
@@ -74,37 +78,38 @@ def main():
                 current_frame = cmd.get("frame")
                 print("Parsed command:", cmd)
                 print(f"Frame set to: {current_frame}")
-                continue
+                robot.execution_status += f"Reference frame set to {current_frame}"
 
             # -------- SEQUENCE MODE --------
             # Activate sequence recording mode
-            if action == "sequence_mode":
+            elif action == "sequence_mode":
                 print("Parsed command:", cmd)
                 sequence.start_sequence_mode()
                 print("Sequence mode activated")
-                continue
+                robot.execution_status += "Sequence mode activated. Next commands will be added to the sequence until you say 'run sequence'."
 
             # Clear stored sequence
-            if action == "clear_sequence":
+            elif action == "clear_sequence":
                 print("Parsed command:", cmd)
                 sequence.clear()
                 print("Sequence cleared")
-                continue
+                robot.execution_status += "Sequence cleared."
 
             # Display stored sequence
-            if action == "show_sequence":
+            elif action == "show_sequence":
                 commands = sequence.get_commands()
                 if not commands:
                     print("Sequence is empty")
+                    robot.execution_status += "Current sequence is empty."
                 else:
                     print("Current sequence:")
                     for i, c in enumerate(commands, 1):
                         print(f"{i}. {c}")
-                continue
+                        robot.execution_status += f"{i}. {c}\n"
 
             # -------- RUN SEQUENCE --------
             # Execute stored sequence asynchronously
-            if action == "run_sequence":
+            elif action == "run_sequence":
                 print("Parsed command:", cmd)
                 commands = sequence.get_commands()
                 print(f"Running sequence with {len(commands)} commands")
@@ -119,6 +124,7 @@ def main():
                         if robot.stop_requested:
                             robot.stop_requested = False
                             print("Sequence interrupted")
+                            robot.execution_status += "Sequence interrupted by user."
                             break
 
                         # Execute command
@@ -127,44 +133,47 @@ def main():
                         # If command failed or was interrupted → stop sequence
                         if not completed:
                             print("Sequence interrupted")
+                            robot.execution_status += "Sequence interrupted during execution."
                             break
 
                     # Exit sequence mode after execution
                     sequence.stop_sequence_mode()
                     print("Sequence finished")
+                    robot.execution_status += "Sequence execution finished."
 
                 # Run sequence in separate thread (non-blocking)
                 threading.Thread(target=worker, daemon=True).start()
-                continue
 
             # -------- APPLY FRAME --------
             # Apply global frame if not specified in command
-            if cmd.get("frame") is None:
+            elif cmd.get("frame") is None:
                 cmd["frame"] = current_frame
 
             # -------- EXECUTION --------
-            if sequence.is_active():
+            elif sequence.is_active():
                 # Add command to sequence instead of executing
                 sequence.add_command(cmd)
                 print("Command added to sequence")
+                robot.execution_status += "Command added to sequence."
             else:
-                print(f"Executing command {cmd}")
+                app.display_information(information=f"Executing command immediately")
                 # Prevent concurrent motion
                 if robot.is_moving:
-                    print("Robot already moving")
-                    continue
-
+                    robot.execution_status += "Robot already moving."
+                else:
                 # Execute command in separate thread (non-blocking)
-                threading.Thread(
-                    target=robot.execute_command,
-                    args=(cmd,),
-                    daemon=True
-                ).start()
-                app.reset()
-
-            app.update_ui(activateButton=False, result="Command executed")
+                    threading.Thread(
+                        target=robot.execute_command,
+                        args=(cmd,),
+                        daemon=True
+                    ).start()
+                    robot.execution_status += "Command executed"
             
-
+        # After execution, reset app state for next command
+            app.reset()
+        # And display that command was executed (for user feedback)
+            app.display_information(information = robot.execution_status)
+            robot.execution_status = ""
 
     finally:
         # Ensure robot is properly stopped when exiting program
